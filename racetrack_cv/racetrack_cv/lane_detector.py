@@ -7,9 +7,38 @@ import math
 import cv2
 
 from cv_bridge import CvBridge, CvBridgeError
-from vs_msgs.msg import ConeLocationPixel
+from vs_msgs.msg import ConeLocationPixel, ConeLocation
+from visualization_msgs.msg import Marker, MarkerArray
 
 from sensor_msgs.msg import Image
+
+from racetrack_cv.visualization_tools import VisualizationTools
+
+# from visual servoing lab
+######################################################
+PTS_IMAGE_PLANE = [[289, 263],
+                   [71, 299],
+                   [492, 229],
+                   [562, 237],
+                   [342, 217],
+                   [606, 323],
+                   [266, 294]]
+######################################################
+
+# PTS_GROUND_PLANE units are in inches
+# car looks along positive x axis with positive y axis to left
+
+######################################################
+PTS_GROUND_PLANE = [[21.65, 4.53],
+                    [16.54, 15.16],
+                    [30.12, -13.39],
+                    [26.77, -17.32],
+                    [35.43, 0],
+                    [13.78, -9.84],
+                    [16.93, 5.12]]
+######################################################
+
+METERS_PER_INCH = 0.0254
 
 class LaneDetector(Node):
     def __init__(self):
@@ -27,10 +56,47 @@ class LaneDetector(Node):
 
         self.get_logger().info(f'WHITE PIXEL HSV LIMITS: {self.white_lower_lims, self.white_upper_lims}')
         
-        self.cone_pub = self.create_publisher(ConeLocationPixel, "/relative_cone_px", 10)
+        self.cone_pub = self.create_publisher(ConeLocation, "/relative_cone", 10)
+        self.marker_pub = self.create_publisher(MarkerArray, "/markers", 1)
+        self.cone_px_pub = self.create_publisher(ConeLocationPixel, "/relative_cone_px", 10)
         self.debug_pub = self.create_publisher(Image, "/cv_debug_img", 10)
         self.image_sub = self.create_subscription(Image, "camera_topic", self.image_callback, 5)
         self.bridge = CvBridge()
+
+        np_pts_ground = np.array(PTS_GROUND_PLANE)
+        np_pts_ground = np_pts_ground * METERS_PER_INCH
+        np_pts_ground = np.float32(np_pts_ground[:, np.newaxis, :])
+
+        np_pts_image = np.array(PTS_IMAGE_PLANE)
+        np_pts_image = np_pts_image * 1.0
+        np_pts_image = np.float32(np_pts_image[:, np.newaxis, :])
+
+        self.h, err = cv2.findHomography(np_pts_image, np_pts_ground)
+
+    # from visual servoing lab
+    def transformUvToXy(self, u, v):
+        """
+        u and v are pixel coordinates.
+        The top left pixel is the origin, u axis increases to right, and v axis
+        increases down.
+
+        Returns a normal non-np 1x2 matrix of xy displacement vector from the
+        camera to the point on the ground plane.
+        Camera points along positive x axis and y axis increases to the left of
+        the camera.
+
+        Units are in meters.
+        """
+        homogeneous_point = np.array([[u], [v], [1]])
+        xy = np.dot(self.h, homogeneous_point)
+        scaling_factor = 1.0 / xy[2, 0]
+        homogeneous_xy = xy * scaling_factor
+        x = homogeneous_xy[0, 0]
+        y = homogeneous_xy[1, 0]
+
+        self.get_logger().info(f"Pixel ({u},{v}) -> World ({x:.2f}, {y:.2f})")
+        
+        return x, y
 
     def image_callback(self, img_msg):
         # get image and convert to HSV
@@ -82,28 +148,86 @@ class LaneDetector(Node):
                 if theta > 0 and (right_line is None or abs(right_line[1]) > abs(theta)):
                     right_line = (r, theta, slope, offset)
 
+            marker_arr = MarkerArray()
+
             if left_line is not None:
                 r, theta, slope, offset = left_line
                 mask_rgb = cv2.line(mask_rgb, (0, int(offset)), (int(mask.shape[1]), int(slope*mask.shape[1]+offset)), (255.0, 0.0, 0.0), 5)
+                left_line_x1_px, left_line_y1_px = int((mask.shape[0]-offset)/slope), mask.shape[0] # intersect with bottom of focused area (closest point)
+                left_line_x2_px, left_line_y2_px = int(-offset/slope), 0 # intersect with top of focused area (furthest point) -> SHOULD BE ON THE GROUND
+                mask_rgb = cv2.circle(mask_rgb, (left_line_x1_px, left_line_y1_px), 5, (0.0, 255.0, 0.0), 5)
+                mask_rgb = cv2.circle(mask_rgb, (left_line_x2_px, left_line_y2_px), 5, (0.0, 0.0, 255.0), 5)
+                left_line_x1_px += min_y
+                left_line_x2_px += min_y
+                left_line_y1_px += min_x
+                left_line_y2_px += min_x
+                closest_left = self.transformUvToXy(left_line_x1_px, left_line_y1_px)
+                furthest_left = self.transformUvToXy(left_line_x2_px, left_line_y2_px)
+                slope_left = (furthest_left[1]-closest_left[1])/(furthest_left[0]-closest_left[0])
+                offset_left = closest_left[1]-slope_left*closest_left[0]
+                self.get_logger().info(f'LEFT LINE PROJECTED PARAMS: {slope_left, offset_left}')
+                marker_arr.markers.append(VisualizationTools.plot_line([closest_left[0], furthest_left[0]], [closest_left[1], furthest_left[1]], 0, (1.0, 0.0, 0.0)))
             if right_line is not None:
                 r, theta, slope, offset = right_line
                 mask_rgb = cv2.line(mask_rgb, (0, int(offset)), (int(mask.shape[1]), int(slope*mask.shape[1]+offset)), (0.0, 255.0, 0.0), 5)
+                right_line_x1_px, right_line_y1_px = int((mask.shape[0]-offset)/slope), mask.shape[0] # intersect with bottom of focused area (closest point)
+                right_line_x2_px, right_line_y2_px = int(-offset/slope), 0 # intersect with top of focused area (furthest point) -> SHOULD BE ON THE GROUND
+                mask_rgb = cv2.circle(mask_rgb, (right_line_x1_px, right_line_y1_px), 5, (0.0, 255.0, 0.0), 5)
+                mask_rgb = cv2.circle(mask_rgb, (right_line_x2_px, right_line_y2_px), 5, (0.0, 0.0, 255.0), 5)
+                right_line_x1_px += min_y
+                right_line_x2_px += min_y
+                right_line_y1_px += min_x
+                right_line_y2_px += min_x
+                closest_right = self.transformUvToXy(right_line_x1_px, right_line_y1_px)
+                furthest_right = self.transformUvToXy(right_line_x2_px, right_line_y2_px)
+                slope_right = (furthest_right[1]-closest_right[1])/(furthest_right[0]-closest_right[0])
+                offset_right = closest_right[1]-slope_right*closest_right[0]
+                self.get_logger().info(f'RIGHT LINE PROJECTED PARAMS: {slope_right, offset_right}')
+                marker_arr.markers.append(VisualizationTools.plot_line([closest_right[0], furthest_right[0]], [closest_right[1], furthest_right[1]], 1, (0.0, 1.0, 0.0)))
+            
+            self.marker_pub.publish(marker_arr)
 
-            x_pixel, y_pixel = 0, 0
-            cone_pixel = ConeLocationPixel()
-            cone_pixel.u = float(x_pixel+min_x)
-            cone_pixel.v = float(y_pixel+min_y)
-            self.cone_pub.publish(cone_pixel)
+            # logic for finding goal point between lines (or offset from one if only one found)
+
+            # x_pixel, y_pixel = 0, 0
+            # cone_pixel = ConeLocationPixel()
+            # cone_pixel.u = float(x_pixel+min_x)
+            # cone_pixel.v = float(y_pixel+min_y)
+            # self.cone_px_pub.publish(cone_pixel)
+
+            # relative_xy_msg = ConeLocation()
+            # relative_xy_msg.x_pos = x
+            # relative_xy_msg.y_pos = y
+
+            # self.cone_pub.publish(relative_xy_msg)
+            # self.draw_marker(x, y, "base_link")
 
         # debug_msg = self.bridge.cv2_to_imgmsg(mask, "8UC1")
         debug_msg = self.bridge.cv2_to_imgmsg(mask_rgb, "rgb8")
         # debug_msg = self.bridge.cv2_to_imgmsg(focused_img, "bgr8")
 
-        # cv2.imshow("image", mask_rgb)
-        # cv2.waitKey(0)
-        # cv2.destroyAllWindows()
-
-        self.debug_pub.publish(debug_msg)   
+        self.debug_pub.publish(debug_msg)
+    
+    # from visual servoing lab
+    def draw_marker(self, cone_x, cone_y, message_frame):
+        """
+        Publish a marker to represent the cone in rviz.
+        (Call this function if you want)
+        """
+        marker = Marker()
+        marker.header.frame_id = message_frame
+        marker.type = marker.CYLINDER
+        marker.action = marker.ADD
+        marker.scale.x = .2
+        marker.scale.y = .2
+        marker.scale.z = .2
+        marker.color.a = 1.0
+        marker.color.r = 1.0
+        marker.color.g = .5
+        marker.pose.orientation.w = 1.0
+        marker.pose.position.x = cone_x
+        marker.pose.position.y = cone_y
+        self.marker_pub.publish(marker)
 
 def main():
     rclpy.init()

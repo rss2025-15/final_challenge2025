@@ -1,0 +1,6 @@
+lane_detector:
+  ros__parameters:
+    white_lower_lims: [0, 0, 200]
+    white_upper_lims: [179, 25, 255]
+    focus_area: [0.5, 0.0, 1.0, 1.0]
+    line_angle_limit: 90.0

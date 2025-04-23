@@ -50,6 +50,7 @@ class LaneDetector(Node):
         self.declare_parameter("line_angle_limit", 0.0)
         self.declare_parameter("lane_width", 0.0)
         self.declare_parameter("lookahead", 1.0)
+        self.declare_parameter("close_to_line_thres", 0.0)
 
         self.white_lower_lims = self.get_parameter("white_lower_lims").value
         self.white_upper_lims = self.get_parameter("white_upper_lims").value
@@ -57,6 +58,7 @@ class LaneDetector(Node):
         self.line_angle_limit = self.get_parameter("line_angle_limit").get_parameter_value().double_value
         self.lane_width = self.get_parameter("lane_width").get_parameter_value().double_value
         self.lookahead = self.get_parameter("lookahead").get_parameter_value().double_value
+        self.close_to_line_thres = self.get_parameter("close_to_line_thres").get_parameter_value().double_value
 
         self.get_logger().info(f'WHITE PIXEL HSV LIMITS: {self.white_lower_lims, self.white_upper_lims}')
         
@@ -79,6 +81,9 @@ class LaneDetector(Node):
         # self.original_width = 720
         # self.original_height = 1280
 
+        self.prev_to_right = False
+        self.prev_to_left = False
+
     # from visual servoing lab
     def transformUvToXy(self, u, v):
         """
@@ -100,7 +105,7 @@ class LaneDetector(Node):
         x = homogeneous_xy[0, 0]
         y = homogeneous_xy[1, 0]
 
-        self.get_logger().info(f"Pixel ({u},{v}) -> World ({x:.2f}, {y:.2f})")
+        # self.get_logger().info(f"Pixel ({u},{v}) -> World ({x:.2f}, {y:.2f})")
         
         return x, y
 
@@ -183,7 +188,7 @@ class LaneDetector(Node):
                 furthest_left = self.transformUvToXy(left_line_x2_px, left_line_y2_px)
                 slope_left = (furthest_left[1]-closest_left[1])/(furthest_left[0]-closest_left[0])
                 offset_left = closest_left[1]-slope_left*closest_left[0]
-                self.get_logger().info(f'LEFT LINE PROJECTED PARAMS: {slope_left, offset_left}')
+                # self.get_logger().info(f'LEFT LINE PROJECTED PARAMS: {slope_left, offset_left}')
                 marker_arr.markers.append(VisualizationTools.plot_line([closest_left[0], furthest_left[0]], [closest_left[1], furthest_left[1]], 0, (1.0, 0.0, 0.0)))
             if right_line is not None:
                 r, theta, slope, offset = right_line
@@ -200,37 +205,106 @@ class LaneDetector(Node):
                 furthest_right = self.transformUvToXy(right_line_x2_px, right_line_y2_px)
                 slope_right = (furthest_right[1]-closest_right[1])/(furthest_right[0]-closest_right[0])
                 offset_right = closest_right[1]-slope_right*closest_right[0]
-                self.get_logger().info(f'RIGHT LINE PROJECTED PARAMS: {slope_right, offset_right}')
+                # self.get_logger().info(f'RIGHT LINE PROJECTED PARAMS: {slope_right, offset_right}')
                 marker_arr.markers.append(VisualizationTools.plot_line([closest_right[0], furthest_right[0]], [closest_right[1], furthest_right[1]], 1, (0.0, 1.0, 0.0)))
-            
-            # logic for finding goal point between lines (or offset from one if only one found) using the projected lanes
 
             if left_line is not None or right_line is not None:
-                if left_line is not None and right_line is not None:
-                    # find middle line
-                    slope_mid = (slope_left+slope_right)/2
-                    offset_mid = (offset_left+offset_right)/2
-                elif right_line is None:
-                    # only left, offset by distance
-                    slope_mid = slope_left
-                    offset_mid = offset_left + self.lane_width*math.sqrt(slope_left**2+1)/2
-                elif left_line is None:
-                    # only right
-                    slope_mid = slope_right
-                    offset_mid = offset_right - self.lane_width*math.sqrt(slope_right**2+1)/2
+                close_left = False
+                close_right = False
+                far_left = False
+                far_right = False
+                to_left = False
+                to_right = False
+                dist_left = None
+                dist_right = None
 
-            # lookahead is from start of the line not from robot, to hopefully make recovery smoother (also easier math for me)
-            x_real, y_real = self.lookahead/math.sqrt(slope_mid**2+1), slope_mid*self.lookahead/math.sqrt(slope_mid**2+1)+offset_mid
+                if left_line is not None:
+                    dist_left = abs(offset_left)/math.sqrt(offset_left**2+slope_left**2+1)
+                    if dist_left < self.close_to_line_thres*self.lane_width:
+                        close_left = True
+                    if dist_left > (1-self.close_to_line_thres)*self.lane_width:
+                        far_left = True
+                if right_line is not None:
+                    dist_right = abs(offset_right)/math.sqrt(offset_right**2+slope_right**2+1)
+                    if dist_right < self.close_to_line_thres*self.lane_width:
+                        close_right = True
+                    if dist_right > (1-self.close_to_line_thres)*self.lane_width:
+                        far_right = True
 
-            marker_arr.markers.append(VisualizationTools.plot_line([0.0, x_real], [offset_mid, y_real], 2, (0.0, 0.0, 1.0)))
+                if close_right or far_left:
+                    to_right = True
+                
+                if close_left or far_right:
+                    to_left = True
 
-            relative_xy_msg = ConeLocation()
-            relative_xy_msg.x_pos = x_real
-            relative_xy_msg.y_pos = y_real
+                status = 0
+                if self.prev_to_left and to_right:
+                    # went left
+                    status = -1
+                elif self.prev_to_right and to_left:
+                    # went right
+                    status = 1
 
-            self.cone_pub.publish(relative_xy_msg)
-            marker_arr.markers.append(self.draw_marker(x_real, y_real, "base_link", 3))
-            self.marker_pub.publish(marker_arr)
+                # logic for finding goal point between lines (or offset from one if only one found) using the projected lanes
+
+                if status == 0:
+                    # stayed in lane
+                    if left_line is not None and right_line is not None:
+                        # find middle line
+                        slope_mid = (slope_left+slope_right)/2
+                        offset_mid = (offset_left+offset_right)/2
+                    elif right_line is None:
+                        # only left, offset by distance
+                        slope_mid = slope_left
+                        offset_mid = offset_left + self.lane_width*math.sqrt(slope_mid**2+1)/2
+                    elif left_line is None:
+                        # only right
+                        slope_mid = slope_right
+                        offset_mid = offset_right - self.lane_width*math.sqrt(slope_mid**2+1)/2
+                elif status == -1:
+                    # went left, put goal to right
+                    if left_line is not None and right_line is not None:
+                        # find middle line
+                        slope_mid = (slope_left+slope_right)/2
+                        offset_mid = (offset_left+offset_right)/2 + self.lane_width*math.sqrt(slope_mid**2+1)
+                    elif right_line is None:
+                        # only left, offset by distance
+                        slope_mid = slope_left
+                        offset_mid = offset_left + 3*self.lane_width*math.sqrt(slope_mid**2+1)/2
+                    elif left_line is None:
+                        # only right
+                        slope_mid = slope_right
+                        offset_mid = offset_right + self.lane_width*math.sqrt(slope_mid**2+1)/2
+                else:
+                    # went right, put goal to left
+                    if left_line is not None and right_line is not None:
+                        # find middle line
+                        slope_mid = (slope_left+slope_right)/2
+                        offset_mid = (offset_left+offset_right)/2 - self.lane_width*math.sqrt(slope_mid**2+1)
+                    elif right_line is None:
+                        # only left, offset by distance
+                        slope_mid = slope_left
+                        offset_mid = offset_left - self.lane_width*math.sqrt(slope_mid**2+1)/2
+                    elif left_line is None:
+                        # only right
+                        slope_mid = slope_right
+                        offset_mid = offset_right - 3*self.lane_width*math.sqrt(slope_mid**2+1)/2
+
+                # lookahead is from start of the line not from robot, to hopefully make recovery smoother (also easier math for me)
+                x_real, y_real = self.lookahead/math.sqrt(slope_mid**2+1), slope_mid*self.lookahead/math.sqrt(slope_mid**2+1)+offset_mid
+
+                marker_arr.markers.append(VisualizationTools.plot_line([0.0, x_real], [offset_mid, y_real], 2, (0.0, 0.0, 1.0)))
+
+                relative_xy_msg = ConeLocation()
+                relative_xy_msg.x_pos = x_real
+                relative_xy_msg.y_pos = y_real
+
+                self.cone_pub.publish(relative_xy_msg)
+                marker_arr.markers.append(self.draw_marker(x_real, y_real, "base_link", 3))
+                self.marker_pub.publish(marker_arr)
+
+                self.prev_to_left = to_left
+                self.prev_to_right = to_right
 
         # debug_msg = self.bridge.cv2_to_imgmsg(mask, "8UC1")
         # debug_msg = self.bridge.cv2_to_imgmsg(mask_rgb, "rgb8")

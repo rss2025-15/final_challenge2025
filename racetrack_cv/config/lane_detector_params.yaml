@@ -6,3 +6,4 @@ lane_detector:
     line_angle_limit: 90.0
     lane_width: 0.7
     lookahead: 1.0
+    close_to_line_thres: 0.2

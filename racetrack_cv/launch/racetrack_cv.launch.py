@@ -20,14 +20,6 @@ def generate_launch_description():
         ]
     )
 
-    homography_transformer=Node(
-        package = 'visual_servoing',
-        executable = 'homography_transformer',
-        remappings = [
-            
-        ]
-    )
     return LaunchDescription([
         lane_detector,
-        # homography_transformer,
     ])

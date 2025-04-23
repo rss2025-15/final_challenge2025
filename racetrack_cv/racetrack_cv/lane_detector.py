@@ -166,9 +166,9 @@ class LaneDetector(Node):
                     continue
                 # self.get_logger().info(f'LINE {i} VALID')
                 # mask_rgb = cv2.line(mask_rgb, (0, int(offset)), (int(mask.shape[1]), int(slope*mask.shape[1]+offset)), (0.0, 0.0, 255.0), 5)
-                if theta < 0 and (left_line is None or abs(left_line[1]) > abs(theta)):
+                if theta > 0 and (left_line is None or abs(left_line[1]) > abs(theta)):
                     left_line = (r, theta, slope, offset)
-                if theta > 0 and (right_line is None or abs(right_line[1]) > abs(theta)):
+                if theta < 0 and (right_line is None or abs(right_line[1]) > abs(theta)):
                     right_line = (r, theta, slope, offset)
 
             marker_arr = MarkerArray()
@@ -256,27 +256,13 @@ class LaneDetector(Node):
                     elif right_line is None:
                         # only left, offset by distance
                         slope_mid = slope_left
-                        offset_mid = offset_left + self.lane_width*math.sqrt(slope_mid**2+1)/2
-                    elif left_line is None:
-                        # only right
-                        slope_mid = slope_right
-                        offset_mid = offset_right - self.lane_width*math.sqrt(slope_mid**2+1)/2
-                elif status == -1:
-                    # went left, put goal to right
-                    if left_line is not None and right_line is not None:
-                        # find middle line
-                        slope_mid = (slope_left+slope_right)/2
-                        offset_mid = (offset_left+offset_right)/2 + self.lane_width*math.sqrt(slope_mid**2+1)
-                    elif right_line is None:
-                        # only left, offset by distance
-                        slope_mid = slope_left
-                        offset_mid = offset_left + 3*self.lane_width*math.sqrt(slope_mid**2+1)/2
+                        offset_mid = offset_left - self.lane_width*math.sqrt(slope_mid**2+1)/2
                     elif left_line is None:
                         # only right
                         slope_mid = slope_right
                         offset_mid = offset_right + self.lane_width*math.sqrt(slope_mid**2+1)/2
-                else:
-                    # went right, put goal to left
+                elif status == -1:
+                    # went left, put goal to right
                     if left_line is not None and right_line is not None:
                         # find middle line
                         slope_mid = (slope_left+slope_right)/2
@@ -284,11 +270,25 @@ class LaneDetector(Node):
                     elif right_line is None:
                         # only left, offset by distance
                         slope_mid = slope_left
-                        offset_mid = offset_left - self.lane_width*math.sqrt(slope_mid**2+1)/2
+                        offset_mid = offset_left - 3*self.lane_width*math.sqrt(slope_mid**2+1)/2
                     elif left_line is None:
                         # only right
                         slope_mid = slope_right
-                        offset_mid = offset_right - 3*self.lane_width*math.sqrt(slope_mid**2+1)/2
+                        offset_mid = offset_right - self.lane_width*math.sqrt(slope_mid**2+1)/2
+                else:
+                    # went right, put goal to left
+                    if left_line is not None and right_line is not None:
+                        # find middle line
+                        slope_mid = (slope_left+slope_right)/2
+                        offset_mid = (offset_left+offset_right)/2 + self.lane_width*math.sqrt(slope_mid**2+1)
+                    elif right_line is None:
+                        # only left, offset by distance
+                        slope_mid = slope_left
+                        offset_mid = offset_left + self.lane_width*math.sqrt(slope_mid**2+1)/2
+                    elif left_line is None:
+                        # only right
+                        slope_mid = slope_right
+                        offset_mid = offset_right + 3*self.lane_width*math.sqrt(slope_mid**2+1)/2
 
                 # lookahead is from start of the line not from robot, to hopefully make recovery smoother (also easier math for me)
                 x_real, y_real = self.lookahead/math.sqrt(slope_mid**2+1), slope_mid*self.lookahead/math.sqrt(slope_mid**2+1)+offset_mid

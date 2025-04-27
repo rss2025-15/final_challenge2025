@@ -14,6 +14,8 @@ from sensor_msgs.msg import Image
 
 from racetrack_cv.visualization_tools import VisualizationTools
 
+from zed_source import zed_source
+
 # from visual servoing lab
 ######################################################
 PTS_IMAGE_PLANE = [[289, 263],
@@ -51,6 +53,7 @@ class LaneDetector(Node):
         self.declare_parameter("lane_width", 0.0)
         self.declare_parameter("lookahead", 1.0)
         self.declare_parameter("close_to_line_thres", 0.0)
+        self.declare_parameter("image_fps", 30)
 
         self.white_lower_lims = self.get_parameter("white_lower_lims").value
         self.white_upper_lims = self.get_parameter("white_upper_lims").value
@@ -59,14 +62,18 @@ class LaneDetector(Node):
         self.lane_width = self.get_parameter("lane_width").get_parameter_value().double_value
         self.lookahead = self.get_parameter("lookahead").get_parameter_value().double_value
         self.close_to_line_thres = self.get_parameter("close_to_line_thres").get_parameter_value().double_value
+        self.image_fps = self.get_parameter("image_fps").get_parameter_value().integer_value
 
         self.get_logger().info(f'WHITE PIXEL HSV LIMITS: {self.white_lower_lims, self.white_upper_lims}')
         
         self.cone_pub = self.create_publisher(ConeLocation, "/relative_cone", 10)
         self.marker_pub = self.create_publisher(MarkerArray, "/markers", 1)
         self.debug_pub = self.create_publisher(Image, "/cv_debug_img", 10)
-        self.image_sub = self.create_subscription(Image, "camera_topic", self.image_callback, 5)
+        # self.image_sub = self.create_subscription(Image, "camera_topic", self.image_callback, 5)
+        self.image_timer = self.create_timer(1.0/self.image_fps, self.image_callback)
         self.bridge = CvBridge()
+
+        self.zed = zed_source(set_fps=self.image_fps, resize_dim=(640, 360)) # TODO: check if homography works using that resolution or if scaling is different (disproportionate width/height? maybe ROS zed node was cropping and we need to do that too, check FoV)
 
         np_pts_ground = np.array(PTS_GROUND_PLANE)
         np_pts_ground = np_pts_ground * METERS_PER_INCH
@@ -109,9 +116,15 @@ class LaneDetector(Node):
         
         return x, y
 
-    def image_callback(self, img_msg):
+    # def image_callback(self, img_msg):
+    def image_callback(self):
         # get image and convert to HSV
-        image_cv = self.bridge.imgmsg_to_cv2(img_msg, "bgra8")
+        # image_cv = self.bridge.imgmsg_to_cv2(img_msg, "bgra8")
+
+        # use ZED wrapper
+        frame = self.zed.get_frame()
+        image_cv = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR) # to keep rest of the code the same
+
         # just for testing with lower resolution
         # cv2.imshow('img', image_cv)
         # cv2.waitKey(0)

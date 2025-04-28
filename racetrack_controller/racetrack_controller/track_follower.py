@@ -51,7 +51,7 @@ class TrackFollower(Node):
 
         self.no_cone()
 
-        self.get_logger().info("Parking Controller Initialized")
+        self.get_logger().info("Racetrack Controller Initialized")
 
     def odom_callback(self, odom_msg):
         self.odom_speed = -odom_msg.twist.twist.linear.x

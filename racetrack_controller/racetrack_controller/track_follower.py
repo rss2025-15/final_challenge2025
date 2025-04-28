@@ -14,12 +14,11 @@ from nav_msgs.msg import Odometry
 
 class TrackFollower(Node):
     """
-    A controller for parking in front of a cone.
-    Listens for a relative cone location and publishes control commands.
-    Can be used in the simulator and on the real robot.
+    Controller for staying between the lines on the racetrack. 
+    Takes positions of lines from CV and chooses a point between the lines to follow.
     """
     def __init__(self):
-        super().__init__("line_follower")
+        super().__init__("track_follower")
 
         self.declare_parameter("drive_topic")
         DRIVE_TOPIC = self.get_parameter("drive_topic").value # set in launch file; different for simulator vs racecar
@@ -28,7 +27,7 @@ class TrackFollower(Node):
         self.error_pub = self.create_publisher(ParkingError, "/parking_error", 10)
         self.odom_sub = self.create_subscription(Odometry, "/vesc/odom", self.odom_callback, 10)
 
-        # TODO: change this to use midpoint of two lines
+        # TODO: make sure this takes the midpoint of the two lines
         self.create_subscription(ConeLocation, "/relative_cone", 
             self.relative_cone_callback, 1)
 
@@ -150,7 +149,7 @@ class TrackFollower(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    pc = LineFollower()
+    pc = TrackFollower()
     rclpy.spin(pc)
     rclpy.shutdown()
 

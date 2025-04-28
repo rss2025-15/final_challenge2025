@@ -1,0 +1,12 @@
+<launch>
+
+  <!-- Launch the parking controller on the real robot. Launches safety controller, controller node, cone detection node, and the homography transformer -->
+  <!-- Edit this to launch your safety controller you implemented in Lab 3! -->
+  <node pkg="wall_follower" name="safety_controller" exec="safety_controller" output="screen">
+  </node>
+
+  <node pkg="racetrack_controller" name="track_follower" exec="track_follower" output="screen">
+  	<param name="drive_topic" value="/vesc/low_level/input/navigation" />
+  </node>
+
+</launch>

@@ -28,6 +28,7 @@ class TrackFollower(Node):
         self.error_pub = self.create_publisher(ParkingError, "/parking_error", 10)
         self.odom_sub = self.create_subscription(Odometry, "/vesc/odom", self.odom_callback, 10)
 
+        # TODO: change this to use midpoint of two lines
         self.create_subscription(ConeLocation, "/relative_cone", 
             self.relative_cone_callback, 1)
 

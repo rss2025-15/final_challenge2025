@@ -23,7 +23,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'racetrack_controller = racetrack_controller.racetrack_controller:main',
+            'track_follower = racetrack_controller.track_follower:main',
         ],
     },
 )

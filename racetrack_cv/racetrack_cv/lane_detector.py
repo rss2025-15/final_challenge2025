@@ -14,7 +14,7 @@ from sensor_msgs.msg import Image
 
 from racetrack_cv.visualization_tools import VisualizationTools
 
-from zed_source import zed_source
+from racetrack_cv.zed_source import zed_source
 
 # from visual servoing lab
 ######################################################
@@ -91,6 +91,8 @@ class LaneDetector(Node):
         self.prev_to_right = False
         self.prev_to_left = False
 
+        self.status = 0
+
     # from visual servoing lab
     def transformUvToXy(self, u, v):
         """
@@ -154,19 +156,27 @@ class LaneDetector(Node):
         # dilate & erode
         kernel = np.ones((3, 3), np.uint8)
         mask = cv2.erode(mask, kernel, iterations=1)
-        # mask = cv2.dilate(mask, kernel, iterations=1)
+        mask = cv2.dilate(mask, kernel, iterations=1)
 
         # Hough transform
-        lines = cv2.HoughLines(mask, 1, np.pi / 180, 150, None, 0, 0)
+        lines = cv2.HoughLines(mask, 1, np.pi / 180, 125, None, 0, 0)
         # mask_rgb = cv2.cvtColor(mask, cv2.COLOR_GRAY2RGB)
-        left_line, right_line = None, None # (r, theta, slope, offset)
+        # left_line, right_line = None, None # (r, theta, slope, offset)
+        left_line_ground, right_line_ground = None, None # (theta_ground, slope_ground, offset_ground)
         # theta also gives us which lanes are to the left and which are to the right, to know which lane we are in
         if lines is not None:
             for i in range(len(lines)):
                 r = lines[i][0][0]
                 theta = lines[i][0][1]
-                slope = -math.cos(theta)/math.sin(theta)
-                offset = r/math.sin(theta)
+                if theta != 0:
+                    slope = -math.cos(theta)/math.sin(theta)
+                    offset = r/math.sin(theta)
+                else:
+                    slope = 10000
+                    offset = 10000
+                if slope == 0:
+                    continue
+                
                 if theta < 0:
                     theta += np.pi
                 if theta > np.pi:
@@ -175,53 +185,107 @@ class LaneDetector(Node):
                     theta -= np.pi
                 # self.get_logger().info(f'LINE {i} WITH POLAR PARAMS: {r, theta}')
                 # discard if abs(theta) too large -> perpendicular to the track lines
-                if abs(theta) > self.line_angle_limit/180*np.pi:
+
+                # project line onto ground plane
+                # mask_bgr = cv2.line(mask_bgr, (0, int(offset)), (int(mask.shape[1]), int(slope*mask.shape[1]+offset)), (0.0, 0.0, 255.0), 5)
+                line_x1_px, line_y1_px = int((mask.shape[0]-offset)/slope), mask.shape[0] # intersect with bottom of focused area (closest point)
+                line_x2_px, line_y2_px = int(-offset/slope), 0 # intersect with top of focused area (furthest point) -> SHOULD BE ON THE GROUND
+                
+                line_x1_px += min_y
+                line_x2_px += min_y
+                line_y1_px += min_x
+                line_y2_px += min_x
+                closest = self.transformUvToXy(line_x1_px, line_y1_px)
+                furthest = self.transformUvToXy(line_x2_px, line_y2_px)
+                # self.get_logger().info(f'closest: {closest}, furthest: {furthest}')
+                slope_ground = (furthest[1]-closest[1])/(furthest[0]-closest[0])
+                offset_ground = closest[1]-slope_ground*closest[0]
+                theta_ground = math.atan(slope_ground) # -pi/2 to pi/2 wrt to vertical/forwards
+                # if theta_ground < 0:
+                #     theta_ground += math.pi # zero to pi, wrt car horizontal
+                # theta_ground -= math.pi/2.0 # -pi/2 to pi/2, wrt to vertical/forwards
+                
+                # self.get_logger().info(f'THETA GROUND: {theta_ground}, OFFSET GROUND: {offset_ground}')
+                
+                if abs(theta_ground) > self.line_angle_limit/180*np.pi:
                     continue
-                # self.get_logger().info(f'LINE {i} VALID')
-                # mask_rgb = cv2.line(mask_rgb, (0, int(offset)), (int(mask.shape[1]), int(slope*mask.shape[1]+offset)), (0.0, 0.0, 255.0), 5)
-                if theta > 0 and (left_line is None or abs(left_line[1]) > abs(theta)):
-                    left_line = (r, theta, slope, offset)
-                if theta < 0 and (right_line is None or abs(right_line[1]) > abs(theta)):
-                    right_line = (r, theta, slope, offset)
+                
+                if offset_ground > 0 and (left_line_ground is None or abs(left_line_ground[2]) > abs(offset_ground)):
+                    left_line_ground = (theta_ground, slope_ground, offset_ground)
+                    offset_left = offset_ground
+                    slope_img_left = slope
+                    offset_img_left = offset
+                    slope_left = slope_ground
+                    closest_left = closest
+                    furthest_left = furthest
+                    # self.get_logger().info(f'FOUND ONE LEFT: {left_line_ground}')
+                if offset_ground < 0 and (right_line_ground is None or abs(right_line_ground[2]) > abs(offset_ground)):
+                    right_line_ground = (theta_ground, slope_ground, offset_ground)
+                    offset_right = offset_ground
+                    slope_img_right = slope
+                    offset_img_right = offset
+                    slope_right = slope_ground
+                    closest_right = closest
+                    furthest_right = furthest
+                    # self.get_logger().info(f'FOUND ONE RIGHT: {right_line_ground}')
+                
+
+                # if abs(theta) > self.line_angle_limit/180*np.pi:
+                #     continue
+                # # self.get_logger().info(f'LINE {i} VALID')
+                # # mask_rgb = cv2.line(mask_rgb, (0, int(offset)), (int(mask.shape[1]), int(slope*mask.shape[1]+offset)), (0.0, 0.0, 255.0), 5)
+                # if theta > 0 and (left_line is None or abs(left_line[1]) > abs(theta)):
+                #     left_line = (r, theta, slope, offset)
+                # if theta < 0 and (right_line is None or abs(right_line[1]) > abs(theta)):
+                #     right_line = (r, theta, slope, offset)
 
             marker_arr = MarkerArray()
 
-            if left_line is not None:
-                r, theta, slope, offset = left_line
-                mask_bgr = cv2.line(mask_bgr, (0, int(offset)), (int(mask.shape[1]), int(slope*mask.shape[1]+offset)), (0.0, 0.0, 255.0), 5)
-                left_line_x1_px, left_line_y1_px = int((mask.shape[0]-offset)/slope), mask.shape[0] # intersect with bottom of focused area (closest point)
-                left_line_x2_px, left_line_y2_px = int(-offset/slope), 0 # intersect with top of focused area (furthest point) -> SHOULD BE ON THE GROUND
-                mask_bgr = cv2.circle(mask_bgr, (left_line_x1_px, left_line_y1_px), 5, (0.0, 255.0, 0.0), 5)
-                mask_bgr = cv2.circle(mask_bgr, (left_line_x2_px, left_line_y2_px), 5, (255.0, 0.0, 0.0), 5)
-                left_line_x1_px += min_y
-                left_line_x2_px += min_y
-                left_line_y1_px += min_x
-                left_line_y2_px += min_x
-                closest_left = self.transformUvToXy(left_line_x1_px, left_line_y1_px)
-                furthest_left = self.transformUvToXy(left_line_x2_px, left_line_y2_px)
-                slope_left = (furthest_left[1]-closest_left[1])/(furthest_left[0]-closest_left[0])
-                offset_left = closest_left[1]-slope_left*closest_left[0]
-                # self.get_logger().info(f'LEFT LINE PROJECTED PARAMS: {slope_left, offset_left}')
+            if left_line_ground is not None:
+                mask_bgr = cv2.line(mask_bgr, (0, int(offset_img_left)), (int(mask.shape[1]), int(slope_img_left*mask.shape[1]+offset_img_left)), (0.0, 0.0, 255.0), 5)
                 marker_arr.markers.append(VisualizationTools.plot_line([closest_left[0], furthest_left[0]], [closest_left[1], furthest_left[1]], 0, (1.0, 0.0, 0.0)))
-            if right_line is not None:
-                r, theta, slope, offset = right_line
-                mask_bgr = cv2.line(mask_bgr, (0, int(offset)), (int(mask.shape[1]), int(slope*mask.shape[1]+offset)), (0.0, 255.0, 0.0), 5)
-                right_line_x1_px, right_line_y1_px = int((mask.shape[0]-offset)/slope), mask.shape[0] # intersect with bottom of focused area (closest point)
-                right_line_x2_px, right_line_y2_px = int(-offset/slope), 0 # intersect with top of focused area (furthest point) -> SHOULD BE ON THE GROUND
-                mask_bgr = cv2.circle(mask_bgr, (right_line_x1_px, right_line_y1_px), 5, (0.0, 255.0, 0.0), 5)
-                mask_bgr = cv2.circle(mask_bgr, (right_line_x2_px, right_line_y2_px), 5, (255.0, 0.0, 0.0), 5)
-                right_line_x1_px += min_y
-                right_line_x2_px += min_y
-                right_line_y1_px += min_x
-                right_line_y2_px += min_x
-                closest_right = self.transformUvToXy(right_line_x1_px, right_line_y1_px)
-                furthest_right = self.transformUvToXy(right_line_x2_px, right_line_y2_px)
-                slope_right = (furthest_right[1]-closest_right[1])/(furthest_right[0]-closest_right[0])
-                offset_right = closest_right[1]-slope_right*closest_right[0]
-                # self.get_logger().info(f'RIGHT LINE PROJECTED PARAMS: {slope_right, offset_right}')
+                # self.get_logger().info(f'LEFT LINE GROUND: {left_line_ground}, closest left: {closest_left}, furthest left: {furthest_left}')
+            if right_line_ground is not None:
+                mask_bgr = cv2.line(mask_bgr, (0, int(offset_img_right)), (int(mask.shape[1]), int(slope_img_right*mask.shape[1]+offset_img_right)), (0.0, 255.0, 0.0), 5)
                 marker_arr.markers.append(VisualizationTools.plot_line([closest_right[0], furthest_right[0]], [closest_right[1], furthest_right[1]], 1, (0.0, 1.0, 0.0)))
+                # self.get_logger().info(f'RIGHT LINE GROUND: {right_line_ground}, closest right: {closest_right}, furthest right: {furthest_right}')
 
-            if left_line is not None or right_line is not None:
+            # if left_line is not None:
+            #     r, theta, slope, offset = left_line
+            #     mask_bgr = cv2.line(mask_bgr, (0, int(offset)), (int(mask.shape[1]), int(slope*mask.shape[1]+offset)), (0.0, 0.0, 255.0), 5)
+            #     left_line_x1_px, left_line_y1_px = int((mask.shape[0]-offset)/slope), mask.shape[0] # intersect with bottom of focused area (closest point)
+            #     left_line_x2_px, left_line_y2_px = int(-offset/slope), 0 # intersect with top of focused area (furthest point) -> SHOULD BE ON THE GROUND
+            #     # mask_bgr = cv2.circle(mask_bgr, (left_line_x1_px, left_line_y1_px), 5, (0.0, 255.0, 0.0), 5)
+            #     # mask_bgr = cv2.circle(mask_bgr, (left_line_x2_px, left_line_y2_px), 5, (255.0, 0.0, 0.0), 5)
+            #     left_line_x1_px += min_y
+            #     left_line_x2_px += min_y
+            #     left_line_y1_px += min_x
+            #     left_line_y2_px += min_x
+            #     closest_left = self.transformUvToXy(left_line_x1_px, left_line_y1_px)
+            #     furthest_left = self.transformUvToXy(left_line_x2_px, left_line_y2_px)
+            #     slope_left = (furthest_left[1]-closest_left[1])/(furthest_left[0]-closest_left[0])
+            #     offset_left = closest_left[1]-slope_left*closest_left[0]
+            #     # self.get_logger().info(f'LEFT LINE PROJECTED PARAMS: {slope_left, offset_left}')
+            #     marker_arr.markers.append(VisualizationTools.plot_line([closest_left[0], furthest_left[0]], [closest_left[1], furthest_left[1]], 0, (1.0, 0.0, 0.0)))
+            # if right_line is not None:
+            #     r, theta, slope, offset = right_line
+            #     mask_bgr = cv2.line(mask_bgr, (0, int(offset)), (int(mask.shape[1]), int(slope*mask.shape[1]+offset)), (0.0, 255.0, 0.0), 5)
+            #     right_line_x1_px, right_line_y1_px = int((mask.shape[0]-offset)/slope), mask.shape[0] # intersect with bottom of focused area (closest point)
+            #     right_line_x2_px, right_line_y2_px = int(-offset/slope), 0 # intersect with top of focused area (furthest point) -> SHOULD BE ON THE GROUND
+            #     # mask_bgr = cv2.circle(mask_bgr, (right_line_x1_px, right_line_y1_px), 5, (0.0, 255.0, 0.0), 5)
+            #     # mask_bgr = cv2.circle(mask_bgr, (right_line_x2_px, right_line_y2_px), 5, (255.0, 0.0, 0.0), 5)
+            #     right_line_x1_px += min_y
+            #     right_line_x2_px += min_y
+            #     right_line_y1_px += min_x
+            #     right_line_y2_px += min_x
+            #     closest_right = self.transformUvToXy(right_line_x1_px, right_line_y1_px)
+            #     furthest_right = self.transformUvToXy(right_line_x2_px, right_line_y2_px)
+            #     slope_right = (furthest_right[1]-closest_right[1])/(furthest_right[0]-closest_right[0])
+            #     offset_right = closest_right[1]-slope_right*closest_right[0]
+            #     # self.get_logger().info(f'RIGHT LINE PROJECTED PARAMS: {slope_right, offset_right}')
+            #     marker_arr.markers.append(VisualizationTools.plot_line([closest_right[0], furthest_right[0]], [closest_right[1], furthest_right[1]], 1, (0.0, 1.0, 0.0)))
+
+            if left_line_ground is not None or right_line_ground is not None:
                 close_left = False
                 close_right = False
                 far_left = False
@@ -231,13 +295,13 @@ class LaneDetector(Node):
                 dist_left = None
                 dist_right = None
 
-                if left_line is not None:
+                if left_line_ground is not None:
                     dist_left = abs(offset_left)/math.sqrt(offset_left**2+slope_left**2+1)
                     if dist_left < self.close_to_line_thres*self.lane_width:
                         close_left = True
                     if dist_left > (1-self.close_to_line_thres)*self.lane_width:
                         far_left = True
-                if right_line is not None:
+                if right_line_ground is not None:
                     dist_right = abs(offset_right)/math.sqrt(offset_right**2+slope_right**2+1)
                     if dist_right < self.close_to_line_thres*self.lane_width:
                         close_right = True
@@ -250,55 +314,54 @@ class LaneDetector(Node):
                 if close_left or far_right:
                     to_left = True
 
-                status = 0
                 if self.prev_to_left and to_right:
                     # went left
-                    status = -1
+                    self.status -= 1
                 elif self.prev_to_right and to_left:
                     # went right
-                    status = 1
+                    self.status += 1
 
                 # logic for finding goal point between lines (or offset from one if only one found) using the projected lanes
 
-                if status == 0:
+                if self.status == 0:
                     # stayed in lane
-                    if left_line is not None and right_line is not None:
+                    if left_line_ground is not None and right_line_ground is not None:
                         # find middle line
                         slope_mid = (slope_left+slope_right)/2
                         offset_mid = (offset_left+offset_right)/2
-                    elif right_line is None:
+                    elif right_line_ground is None:
                         # only left, offset by distance
                         slope_mid = slope_left
                         offset_mid = offset_left - self.lane_width*math.sqrt(slope_mid**2+1)/2
-                    elif left_line is None:
+                    elif left_line_ground is None:
                         # only right
                         slope_mid = slope_right
                         offset_mid = offset_right + self.lane_width*math.sqrt(slope_mid**2+1)/2
-                elif status == -1:
+                elif self.status < 0:
                     # went left, put goal to right
-                    if left_line is not None and right_line is not None:
+                    if left_line_ground is not None and right_line_ground is not None:
                         # find middle line
                         slope_mid = (slope_left+slope_right)/2
                         offset_mid = (offset_left+offset_right)/2 - self.lane_width*math.sqrt(slope_mid**2+1)
-                    elif right_line is None:
+                    elif right_line_ground is None:
                         # only left, offset by distance
                         slope_mid = slope_left
                         offset_mid = offset_left - 3*self.lane_width*math.sqrt(slope_mid**2+1)/2
-                    elif left_line is None:
+                    elif left_line_ground is None:
                         # only right
                         slope_mid = slope_right
                         offset_mid = offset_right - self.lane_width*math.sqrt(slope_mid**2+1)/2
                 else:
                     # went right, put goal to left
-                    if left_line is not None and right_line is not None:
+                    if left_line_ground is not None and right_line_ground is not None:
                         # find middle line
                         slope_mid = (slope_left+slope_right)/2
                         offset_mid = (offset_left+offset_right)/2 + self.lane_width*math.sqrt(slope_mid**2+1)
-                    elif right_line is None:
+                    elif right_line_ground is None:
                         # only left, offset by distance
                         slope_mid = slope_left
                         offset_mid = offset_left + self.lane_width*math.sqrt(slope_mid**2+1)/2
-                    elif left_line is None:
+                    elif left_line_ground is None:
                         # only right
                         slope_mid = slope_right
                         offset_mid = offset_right + 3*self.lane_width*math.sqrt(slope_mid**2+1)/2
@@ -321,7 +384,7 @@ class LaneDetector(Node):
 
         # debug_msg = self.bridge.cv2_to_imgmsg(mask, "8UC1")
         # debug_msg = self.bridge.cv2_to_imgmsg(mask_rgb, "rgb8")
-        debug_msg = self.bridge.cv2_to_imgmsg(mask_bgr, "bgra8")
+        debug_msg = self.bridge.cv2_to_imgmsg(mask_bgr, "bgr8")
 
         self.debug_pub.publish(debug_msg)
     

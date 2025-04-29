@@ -20,10 +20,10 @@ class TrackFollower(Node):
     def __init__(self):
         super().__init__("track_follower")
 
-        self.declare_parameter("drive_topic")
-        DRIVE_TOPIC = self.get_parameter("drive_topic").value # set in launch file; different for simulator vs racecar
+        # self.declare_parameter("drive_topic")
+        # DRIVE_TOPIC = self.get_parameter("drive_topic").value # set in launch file; different for simulator vs racecar
 
-        self.drive_pub = self.create_publisher(AckermannDriveStamped, DRIVE_TOPIC, 10)
+        self.drive_pub = self.create_publisher(AckermannDriveStamped, "/vesc/low_level/input/navigation", 10)
         self.error_pub = self.create_publisher(ParkingError, "/parking_error", 10)
         self.odom_sub = self.create_subscription(Odometry, "/vesc/odom", self.odom_callback, 10)
 
@@ -89,7 +89,7 @@ class TrackFollower(Node):
 
             steer_angle = math.atan(self.wheelbase/turn_radius)
             # self.cmd_speed = max(1.0-math.exp(-self.exp_speed_coeff*(lookahead-self.parking_distance)),self.close_speed)
-            self.cmd_speed = 1.0
+            self.cmd_speed = 4.0
             self.drive_cmd(gain*steer_angle, self.cmd_speed)
             self.get_logger().info('FORWARD, STEERING {steer_angle}')
                     

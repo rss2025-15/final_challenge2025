@@ -13,7 +13,7 @@ def _label_to_color(label):
 
 
 class Detector:
-    def __init__(self, yolo_dir="/root/yolo", from_tensor_rt=True, threshold=0.5):
+    def __init__(self, yolo_dir="/root/yolo", from_tensor_rt=False, threshold=0.5):
         # local import
         from ultralytics import YOLO
         cls = YOLO
@@ -130,7 +130,7 @@ def demo():
     model = Detector()
     model.set_threshold(0.5)
     
-    img_path = f"{os.path.dirname(__file__)}/../../media/minion.png" 
+    img_path = f"{os.path.dirname(__file__)}/../../media/red.jpg" 
         
     img = Image.open(img_path)
     results = model.predict(img)

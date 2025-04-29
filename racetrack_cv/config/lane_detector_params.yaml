@@ -3,7 +3,7 @@ lane_detector:
     white_lower_lims: [0, 0, 200]
     white_upper_lims: [179, 25, 255]
     focus_area: [0.5, 0.0, 1.0, 1.0]
-    line_angle_limit: 90.0
+    line_angle_limit: 25.0
     lane_width: 0.8
-    lookahead: 1.0
+    lookahead: 0.7
     close_to_line_thres: 0.2

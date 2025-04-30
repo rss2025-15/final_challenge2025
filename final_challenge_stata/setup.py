@@ -20,6 +20,10 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+        'final_challenge2025.final_challenge_stata.pickup_controller'
+
+        #  'motion_model_test = localization.test.motion_model_test:main',
+        #  'detection_node = localization.detection_node:main',
         ],
     },
 )

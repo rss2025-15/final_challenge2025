@@ -1,0 +1,24 @@
+running develop
+running egg_info
+creating racetrack_controller.egg-info
+writing racetrack_controller.egg-info/PKG-INFO
+writing dependency_links to racetrack_controller.egg-info/dependency_links.txt
+writing entry points to racetrack_controller.egg-info/entry_points.txt
+writing requirements to racetrack_controller.egg-info/requires.txt
+writing top-level names to racetrack_controller.egg-info/top_level.txt
+writing manifest file 'racetrack_controller.egg-info/SOURCES.txt'
+reading manifest file 'racetrack_controller.egg-info/SOURCES.txt'
+writing manifest file 'racetrack_controller.egg-info/SOURCES.txt'
+running build_ext
+Creating /root/racecar_ws/src/final_challenge2025/install/racetrack_controller/lib/python3.10/site-packages/racetrack-controller.egg-link (link to .)
+Installing track_follower script to /root/racecar_ws/src/final_challenge2025/install/racetrack_controller/lib/racetrack_controller
+
+Installed /root/racecar_ws/src/final_challenge2025/build/racetrack_controller
+running symlink_data
+creating /root/racecar_ws/src/final_challenge2025/install/racetrack_controller/share/ament_index
+creating /root/racecar_ws/src/final_challenge2025/install/racetrack_controller/share/ament_index/resource_index
+creating /root/racecar_ws/src/final_challenge2025/install/racetrack_controller/share/ament_index/resource_index/packages
+symbolically linking /root/racecar_ws/src/final_challenge2025/build/racetrack_controller/resource/racetrack_controller -> /root/racecar_ws/src/final_challenge2025/install/racetrack_controller/share/ament_index/resource_index/packages
+symbolically linking /root/racecar_ws/src/final_challenge2025/build/racetrack_controller/package.xml -> /root/racecar_ws/src/final_challenge2025/install/racetrack_controller/share/racetrack_controller
+creating /root/racecar_ws/src/final_challenge2025/install/racetrack_controller/share/visual_servoing
+creating /root/racecar_ws/src/final_challenge2025/install/racetrack_controller/share/visual_servoing/launch

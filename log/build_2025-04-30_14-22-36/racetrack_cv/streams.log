@@ -1,0 +1,30 @@
+[3.971s] Invoking command in '/root/racecar_ws/src/final_challenge2025/build/racetrack_cv': PYTHONPATH=/root/racecar_ws/src/final_challenge2025/build/racetrack_cv/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/root/racecar_ws/src/final_challenge2025/install/racetrack_cv/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --editable --build-directory /root/racecar_ws/src/final_challenge2025/build/racetrack_cv/build --no-deps symlink_data
+[4.803s] running develop
+[5.001s] /usr/lib/python3/dist-packages/pkg_resources/__init__.py:116: PkgResourcesDeprecationWarning: 2.0.5-build-libtorrent-rasterbar-QyJODx-libtorrent-rasterbar-2.0.5-bindings-python is an invalid version and will not be supported in a future release
+[5.001s]   warnings.warn(
+[5.328s] running egg_info
+[5.329s] creating racetrack_cv.egg-info
+[5.329s] writing racetrack_cv.egg-info/PKG-INFO
+[5.330s] writing dependency_links to racetrack_cv.egg-info/dependency_links.txt
+[5.330s] writing entry points to racetrack_cv.egg-info/entry_points.txt
+[5.331s] writing requirements to racetrack_cv.egg-info/requires.txt
+[5.331s] writing top-level names to racetrack_cv.egg-info/top_level.txt
+[5.332s] writing manifest file 'racetrack_cv.egg-info/SOURCES.txt'
+[5.337s] reading manifest file 'racetrack_cv.egg-info/SOURCES.txt'
+[5.339s] writing manifest file 'racetrack_cv.egg-info/SOURCES.txt'
+[5.512s] running build_ext
+[5.513s] Creating /root/racecar_ws/src/final_challenge2025/install/racetrack_cv/lib/python3.10/site-packages/racetrack-cv.egg-link (link to .)
+[5.516s] Installing lane_detector script to /root/racecar_ws/src/final_challenge2025/install/racetrack_cv/lib/racetrack_cv
+[5.517s] 
+[5.517s] Installed /root/racecar_ws/src/final_challenge2025/build/racetrack_cv
+[5.517s] running symlink_data
+[5.517s] creating /root/racecar_ws/src/final_challenge2025/install/racetrack_cv/share/ament_index
+[5.518s] creating /root/racecar_ws/src/final_challenge2025/install/racetrack_cv/share/ament_index/resource_index
+[5.518s] creating /root/racecar_ws/src/final_challenge2025/install/racetrack_cv/share/ament_index/resource_index/packages
+[5.518s] symbolically linking /root/racecar_ws/src/final_challenge2025/build/racetrack_cv/resource/racetrack_cv -> /root/racecar_ws/src/final_challenge2025/install/racetrack_cv/share/ament_index/resource_index/packages
+[5.518s] symbolically linking /root/racecar_ws/src/final_challenge2025/build/racetrack_cv/package.xml -> /root/racecar_ws/src/final_challenge2025/install/racetrack_cv/share/racetrack_cv
+[5.518s] creating /root/racecar_ws/src/final_challenge2025/install/racetrack_cv/share/racetrack_cv/launch
+[5.519s] symbolically linking /root/racecar_ws/src/final_challenge2025/build/racetrack_cv/launch/racetrack_cv.launch.py -> /root/racecar_ws/src/final_challenge2025/install/racetrack_cv/share/racetrack_cv/launch
+[5.519s] creating /root/racecar_ws/src/final_challenge2025/install/racetrack_cv/share/racetrack_cv/config
+[5.519s] symbolically linking /root/racecar_ws/src/final_challenge2025/build/racetrack_cv/config/lane_detector_params.yaml -> /root/racecar_ws/src/final_challenge2025/install/racetrack_cv/share/racetrack_cv/config
+[5.715s] Invoked command in '/root/racecar_ws/src/final_challenge2025/build/racetrack_cv' returned '0': PYTHONPATH=/root/racecar_ws/src/final_challenge2025/build/racetrack_cv/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/root/racecar_ws/src/final_challenge2025/install/racetrack_cv/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --editable --build-directory /root/racecar_ws/src/final_challenge2025/build/racetrack_cv/build --no-deps symlink_data

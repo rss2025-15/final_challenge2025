@@ -1,0 +1,16 @@
+package.xml
+setup.cfg
+setup.py
+final_challenge_stata/__init__.py
+final_challenge_stata/detection_node.py
+final_challenge_stata/detector.py
+final_challenge_stata/speedtest.py
+final_challenge_stata/traffic_light.py
+final_challenge_stata.egg-info/PKG-INFO
+final_challenge_stata.egg-info/SOURCES.txt
+final_challenge_stata.egg-info/dependency_links.txt
+final_challenge_stata.egg-info/entry_points.txt
+final_challenge_stata.egg-info/requires.txt
+final_challenge_stata.egg-info/top_level.txt
+final_challenge_stata.egg-info/zip-safe
+resource/final_challenge_stata

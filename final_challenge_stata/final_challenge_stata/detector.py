@@ -15,7 +15,7 @@ def _label_to_color(label):
 
 # root/racecar_ws/dependencies"
 class Detector:
-    def __init__(self, yolo_dir="/root/yolo", from_tensor_rt=False, threshold=0.5):
+    def __init__(self, yolo_dir="/root/yolo", from_tensor_rt=True, threshold=0.5):
         # local import
         from ultralytics import YOLO
         cls = YOLO
@@ -100,7 +100,7 @@ class Detector:
         except IOError:
             font = ImageFont.load_default()
 
-        print(f"Labels: {[x[-1] for x in predictions]}")
+        # print(f"Labels: {[x[-1] for x in predictions]}")
 
         if draw_all:
             for (x1, y1, x2, y2), label in predictions:

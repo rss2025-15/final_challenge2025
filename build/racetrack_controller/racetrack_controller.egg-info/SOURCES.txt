@@ -1,0 +1,13 @@
+package.xml
+setup.cfg
+setup.py
+racetrack_controller/__init__.py
+racetrack_controller/track_follower.py
+racetrack_controller.egg-info/PKG-INFO
+racetrack_controller.egg-info/SOURCES.txt
+racetrack_controller.egg-info/dependency_links.txt
+racetrack_controller.egg-info/entry_points.txt
+racetrack_controller.egg-info/requires.txt
+racetrack_controller.egg-info/top_level.txt
+racetrack_controller.egg-info/zip-safe
+resource/racetrack_controller

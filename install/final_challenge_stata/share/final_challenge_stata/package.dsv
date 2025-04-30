@@ -1,0 +1,9 @@
+source;share/final_challenge_stata/hook/pythonpath.ps1
+source;share/final_challenge_stata/hook/pythonpath.dsv
+source;share/final_challenge_stata/hook/pythonpath.sh
+source;share/final_challenge_stata/hook/ament_prefix_path.ps1
+source;share/final_challenge_stata/hook/ament_prefix_path.dsv
+source;share/final_challenge_stata/hook/ament_prefix_path.sh
+source;../../build/final_challenge_stata/share/final_challenge_stata/hook/pythonpath_develop.ps1
+source;../../build/final_challenge_stata/share/final_challenge_stata/hook/pythonpath_develop.dsv
+source;../../build/final_challenge_stata/share/final_challenge_stata/hook/pythonpath_develop.sh

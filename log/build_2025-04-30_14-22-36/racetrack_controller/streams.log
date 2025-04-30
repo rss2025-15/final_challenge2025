@@ -1,0 +1,28 @@
+[4.027s] Invoking command in '/root/racecar_ws/src/final_challenge2025/build/racetrack_controller': PYTHONPATH=/root/racecar_ws/src/final_challenge2025/build/racetrack_controller/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/root/racecar_ws/src/final_challenge2025/install/racetrack_controller/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --editable --build-directory /root/racecar_ws/src/final_challenge2025/build/racetrack_controller/build --no-deps symlink_data
+[4.864s] running develop
+[5.047s] /usr/lib/python3/dist-packages/pkg_resources/__init__.py:116: PkgResourcesDeprecationWarning: 2.0.5-build-libtorrent-rasterbar-QyJODx-libtorrent-rasterbar-2.0.5-bindings-python is an invalid version and will not be supported in a future release
+[5.048s]   warnings.warn(
+[5.390s] running egg_info
+[5.390s] creating racetrack_controller.egg-info
+[5.390s] writing racetrack_controller.egg-info/PKG-INFO
+[5.391s] writing dependency_links to racetrack_controller.egg-info/dependency_links.txt
+[5.391s] writing entry points to racetrack_controller.egg-info/entry_points.txt
+[5.391s] writing requirements to racetrack_controller.egg-info/requires.txt
+[5.391s] writing top-level names to racetrack_controller.egg-info/top_level.txt
+[5.392s] writing manifest file 'racetrack_controller.egg-info/SOURCES.txt'
+[5.398s] reading manifest file 'racetrack_controller.egg-info/SOURCES.txt'
+[5.400s] writing manifest file 'racetrack_controller.egg-info/SOURCES.txt'
+[5.574s] running build_ext
+[5.574s] Creating /root/racecar_ws/src/final_challenge2025/install/racetrack_controller/lib/python3.10/site-packages/racetrack-controller.egg-link (link to .)
+[5.577s] Installing track_follower script to /root/racecar_ws/src/final_challenge2025/install/racetrack_controller/lib/racetrack_controller
+[5.578s] 
+[5.579s] Installed /root/racecar_ws/src/final_challenge2025/build/racetrack_controller
+[5.579s] running symlink_data
+[5.579s] creating /root/racecar_ws/src/final_challenge2025/install/racetrack_controller/share/ament_index
+[5.579s] creating /root/racecar_ws/src/final_challenge2025/install/racetrack_controller/share/ament_index/resource_index
+[5.579s] creating /root/racecar_ws/src/final_challenge2025/install/racetrack_controller/share/ament_index/resource_index/packages
+[5.579s] symbolically linking /root/racecar_ws/src/final_challenge2025/build/racetrack_controller/resource/racetrack_controller -> /root/racecar_ws/src/final_challenge2025/install/racetrack_controller/share/ament_index/resource_index/packages
+[5.580s] symbolically linking /root/racecar_ws/src/final_challenge2025/build/racetrack_controller/package.xml -> /root/racecar_ws/src/final_challenge2025/install/racetrack_controller/share/racetrack_controller
+[5.580s] creating /root/racecar_ws/src/final_challenge2025/install/racetrack_controller/share/visual_servoing
+[5.580s] creating /root/racecar_ws/src/final_challenge2025/install/racetrack_controller/share/visual_servoing/launch
+[5.828s] Invoked command in '/root/racecar_ws/src/final_challenge2025/build/racetrack_controller' returned '0': PYTHONPATH=/root/racecar_ws/src/final_challenge2025/build/racetrack_controller/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/root/racecar_ws/src/final_challenge2025/install/racetrack_controller/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --editable --build-directory /root/racecar_ws/src/final_challenge2025/build/racetrack_controller/build --no-deps symlink_data

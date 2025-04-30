@@ -1,0 +1,3 @@
+[console_scripts]
+track_follower = racetrack_controller.track_follower:main
+

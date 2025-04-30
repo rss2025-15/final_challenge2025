@@ -1,0 +1,3 @@
+[console_scripts]
+lane_detector = racetrack_cv.lane_detector:main
+

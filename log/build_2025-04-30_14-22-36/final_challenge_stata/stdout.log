@@ -1,0 +1,21 @@
+running develop
+running egg_info
+creating final_challenge_stata.egg-info
+writing final_challenge_stata.egg-info/PKG-INFO
+writing dependency_links to final_challenge_stata.egg-info/dependency_links.txt
+writing entry points to final_challenge_stata.egg-info/entry_points.txt
+writing requirements to final_challenge_stata.egg-info/requires.txt
+writing top-level names to final_challenge_stata.egg-info/top_level.txt
+writing manifest file 'final_challenge_stata.egg-info/SOURCES.txt'
+reading manifest file 'final_challenge_stata.egg-info/SOURCES.txt'
+writing manifest file 'final_challenge_stata.egg-info/SOURCES.txt'
+running build_ext
+Creating /root/racecar_ws/src/final_challenge2025/install/final_challenge_stata/lib/python3.10/site-packages/final-challenge-stata.egg-link (link to .)
+
+Installed /root/racecar_ws/src/final_challenge2025/build/final_challenge_stata
+running symlink_data
+creating /root/racecar_ws/src/final_challenge2025/install/final_challenge_stata/share/ament_index
+creating /root/racecar_ws/src/final_challenge2025/install/final_challenge_stata/share/ament_index/resource_index
+creating /root/racecar_ws/src/final_challenge2025/install/final_challenge_stata/share/ament_index/resource_index/packages
+symbolically linking /root/racecar_ws/src/final_challenge2025/build/final_challenge_stata/resource/final_challenge_stata -> /root/racecar_ws/src/final_challenge2025/install/final_challenge_stata/share/ament_index/resource_index/packages
+symbolically linking /root/racecar_ws/src/final_challenge2025/build/final_challenge_stata/package.xml -> /root/racecar_ws/src/final_challenge2025/install/final_challenge_stata/share/final_challenge_stata

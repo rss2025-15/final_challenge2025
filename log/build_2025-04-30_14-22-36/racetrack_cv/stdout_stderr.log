@@ -1,0 +1,28 @@
+running develop
+/usr/lib/python3/dist-packages/pkg_resources/__init__.py:116: PkgResourcesDeprecationWarning: 2.0.5-build-libtorrent-rasterbar-QyJODx-libtorrent-rasterbar-2.0.5-bindings-python is an invalid version and will not be supported in a future release
+  warnings.warn(
+running egg_info
+creating racetrack_cv.egg-info
+writing racetrack_cv.egg-info/PKG-INFO
+writing dependency_links to racetrack_cv.egg-info/dependency_links.txt
+writing entry points to racetrack_cv.egg-info/entry_points.txt
+writing requirements to racetrack_cv.egg-info/requires.txt
+writing top-level names to racetrack_cv.egg-info/top_level.txt
+writing manifest file 'racetrack_cv.egg-info/SOURCES.txt'
+reading manifest file 'racetrack_cv.egg-info/SOURCES.txt'
+writing manifest file 'racetrack_cv.egg-info/SOURCES.txt'
+running build_ext
+Creating /root/racecar_ws/src/final_challenge2025/install/racetrack_cv/lib/python3.10/site-packages/racetrack-cv.egg-link (link to .)
+Installing lane_detector script to /root/racecar_ws/src/final_challenge2025/install/racetrack_cv/lib/racetrack_cv
+
+Installed /root/racecar_ws/src/final_challenge2025/build/racetrack_cv
+running symlink_data
+creating /root/racecar_ws/src/final_challenge2025/install/racetrack_cv/share/ament_index
+creating /root/racecar_ws/src/final_challenge2025/install/racetrack_cv/share/ament_index/resource_index
+creating /root/racecar_ws/src/final_challenge2025/install/racetrack_cv/share/ament_index/resource_index/packages
+symbolically linking /root/racecar_ws/src/final_challenge2025/build/racetrack_cv/resource/racetrack_cv -> /root/racecar_ws/src/final_challenge2025/install/racetrack_cv/share/ament_index/resource_index/packages
+symbolically linking /root/racecar_ws/src/final_challenge2025/build/racetrack_cv/package.xml -> /root/racecar_ws/src/final_challenge2025/install/racetrack_cv/share/racetrack_cv
+creating /root/racecar_ws/src/final_challenge2025/install/racetrack_cv/share/racetrack_cv/launch
+symbolically linking /root/racecar_ws/src/final_challenge2025/build/racetrack_cv/launch/racetrack_cv.launch.py -> /root/racecar_ws/src/final_challenge2025/install/racetrack_cv/share/racetrack_cv/launch
+creating /root/racecar_ws/src/final_challenge2025/install/racetrack_cv/share/racetrack_cv/config
+symbolically linking /root/racecar_ws/src/final_challenge2025/build/racetrack_cv/config/lane_detector_params.yaml -> /root/racecar_ws/src/final_challenge2025/install/racetrack_cv/share/racetrack_cv/config

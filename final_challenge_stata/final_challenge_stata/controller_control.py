@@ -62,5 +62,13 @@ class Control(Node):
         new_path_goal = shrinkray_count_msg.data
         self.waypoint_pub.publish(self.waypoints[new_path_goal])
 
+
+def main(args=None):
+    rclpy.init(args=args)
+    controller = Control()
+    rclpy.spin(controller)
+    rclpy.shutdown()
+
+
     
 

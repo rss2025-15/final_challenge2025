@@ -2,7 +2,7 @@ import rclpy
 from ackermann_msgs.msg import AckermannDriveStamped
 from geometry_msgs.msg import PoseArray, PoseWithCovarianceStamped, PoseStamped
 from nav_msgs.msg import Odometry
-from std_msgs.msg import Header, Float32, Bool
+from std_msgs.msg import Header, Float32, Bool, Int32
 from rclpy.node import Node
 from visualization_msgs.msg import Marker
 
@@ -75,6 +75,7 @@ class PurePursuit(Node):
         self.kill_yourself = False
 
         self.parking_sub = self.create_subscription(Bool, "/switch_parking", self.parking_cb, 1)
+        self.start_detection_pub = self.create_publisher(Bool, "/start_detection", self.start_detection_cb, 1)
     
     def parking_cb(self, parking_msg):
         if parking_msg.data: self.initialized_traj = False
@@ -241,7 +242,11 @@ class PurePursuit(Node):
 
             dist_to_end = np.linalg.norm([self.trajectory.points[-1][0] - robot_pose[0], self.trajectory.points[-1][1] - robot_pose[1]])
             self.cmd_speed = self.speed if dist_to_end > 1 else 0.0
-            if dist_to_end <= 1:
+            if dist_to_end <= 3:
+                start_detection = Bool()
+                start_detection.data = True
+                self.start_detection_pub.publish(start_detection)
+            elif dist_to_end <= 1:
                 time_to_finish = (self.get_clock().now()-self.start_time).nanoseconds*1e-9
                 self.get_logger().info(f'TIME TO FINISH: {time_to_finish}')
                 time_to_finish_msg = Float32()

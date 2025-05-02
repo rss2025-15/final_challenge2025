@@ -2,7 +2,7 @@ import rclpy
 from rclpy.node import Node
 
 from geometry_msgs.msg import Point, PointStamped, PoseWithCovarianceStamped, Pose, PoseArray
-from std_msgs.msg import Int32
+from std_msgs.msg import Int32, Bool
 
 class Control(Node):
     # "what the hell is going on"
@@ -60,7 +60,7 @@ class Control(Node):
         # after 5 second stop at shrinkray
 
         new_path_goal = shrinkray_count_msg.data
-        self.waypoint_pub.publish(new_path_goal)
+        self.waypoint_pub.publish(self.waypoints[new_path_goal])
 
     
 

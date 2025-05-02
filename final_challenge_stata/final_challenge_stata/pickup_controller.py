@@ -11,14 +11,13 @@ from vs_msgs.msg import ConeLocation, ConeLocationPixel
 import numpy as np
 import math
 from final_challenge_stata.detector import Detector
+from std_msgs.msg import Int32, Bool
+
 
 class DetectorNode(Node):
     def __init__(self):
         super().__init__("detector")
-        # self.detector = Detector()
-        # self.publisher = None #TODO
-        # self.subscriber = self.create_subscription(Image, "/zed/zed_node/rgb/image_rect_color", self.callback, 1)
-        # self.bridge = CvBridge()
+
         ####
         self.drive_topic = "/vesc/low_level/input/navigation"
         self.lookahead = 2.0  # FILL IN #
@@ -35,6 +34,14 @@ class DetectorNode(Node):
         self.detector = Detector()
         self.detector.set_threshold(0.1)
         ####
+        self.send_drive_command = True
+        self.last_switch_command = True
+        self.detect = True
+        # switch
+        # Bool, /switch_parking
+        # /shrinkray_count
+        # / Int32
+
 
 
         ####
@@ -44,11 +51,14 @@ class DetectorNode(Node):
 
         self.homography_subscriber = self.create_subscription(ConeLocation, '/relative_cone', self.homography_callback, 1)
         self.camera_subscriber = self.create_subscription(Image, "/zed/zed_node/rgb/image_rect_color", self.camera_callback, 1)
+        self.start_detection_subscriber = self.create_subscription(Bool, 'start_detection',self.start_detection_callback,  1)
 
         ###publishers
         self.pixel_publisher = self.create_publisher(ConeLocationPixel, "/relative_cone_px", 10)
         self.drive_pub = self.create_publisher(AckermannDriveStamped, self.drive_topic, 10)
         self.debug_pub = self.create_publisher(Image, "/cone_debug_img", 10)
+        self.switch_pub = self.create_publisher(Bool, '/switch_parking', 1)
+        self.shrinkray_count_pub = self.create_publisher(Int32, '/shrinkray_count', 1)
         ###
 
         ####
@@ -57,6 +67,9 @@ class DetectorNode(Node):
 
 
     def camera_callback(self, camera_msg):
+        # return if we are not supposed to be detecting right now
+        if not self.detect:
+            return
 
         # extract the image out of camera msg
         image = self.bridge.imgmsg_to_cv2(camera_msg, "bgr8")
@@ -69,6 +82,12 @@ class DetectorNode(Node):
         for prediction in predictions:
             self.get_logger().info(f'predicion is {prediction}')
             if prediction[1] == 'banana':
+                #if last switch command was True only then publish message to switch
+
+                #turn off the regular follower
+                self.switch_cmd(False)
+
+
 
 
                 # detector returns (xmin, ymin, xmax, ymax)
@@ -123,6 +142,10 @@ class DetectorNode(Node):
         target_distance = math.sqrt((self.target_x)**2 + (self.target_y)**2)
         self.get_logger().info(f'distance of robot from target point is {target_distance}')
 
+
+
+
+
         angle_in_robot_frame = math.atan2(self.target_y, self.target_x)
         self.get_logger().info(f'angle in robot frame is  is {angle_in_robot_frame}')
 
@@ -134,18 +157,29 @@ class DetectorNode(Node):
         if target_distance > 0.5:
             self.drive_cmd(steer_angle, self.cmd_speed)
         else:
+            ##if target distance is less than 0.5 m then send the switch command again
+            self.shrink_count_cmd(1)
+            #stop publishing
+            self.detect = False
+
+
+
+
+
+
             #the car stops moving for 5 seconds and then continues to move
-            if not self.start_time:
-                 self.start_time = self.get_clock().now().nanoseconds*10**-9
-            self.get_logger().info(f'start time is {self.start_time}')
-            self.get_logger().info(f'current time is {self.get_clock().now().nanoseconds*10**-9}')
-            if self.get_clock().now().nanoseconds*10**-9 - self.start_time < 5:
-                self.drive_cmd(steer_angle, 0.0)
-            else:
-                 self.drive_cmd(steer_angle, self.cmd_speed)
+            # if not self.start_time:
+            #      self.start_time = self.get_clock().now().nanoseconds*10**-9
+            # self.get_logger().info(f'start time is {self.start_time}')
+            # self.get_logger().info(f'current time is {self.get_clock().now().nanoseconds*10**-9}')
+            # if self.get_clock().now().nanoseconds*10**-9 - self.start_time < 5:
+            #     self.drive_cmd(steer_angle, 0.0)
+            # else:
+            #      self.drive_cmd(steer_angle, self.cmd_speed)
 
 
-
+    def start_detection_callback(self, bool_msg):
+        self.detect = bool_msg.data
 
 
     def drive_cmd(self, steer, speed = 1.0):
@@ -166,6 +200,18 @@ class DetectorNode(Node):
             drive_cmd_drive.header.stamp = self.get_clock().now().to_msg()
 
             self.drive_pub.publish(drive_cmd_drive)
+
+
+    def switch_cmd(self, bool):
+        msg = Bool()
+        msg.data = bool
+        self.switch_pub.publish(msg)
+
+
+    def shrink_count_cmd (self, count):
+        msg = Int32()
+        msg.data = count
+        self.shrinkray_count_pub.publisg(msg)
 
 
 def main(args=None):

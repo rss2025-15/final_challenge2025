@@ -1,14 +1,18 @@
 <launch>
-    <!-- <node pkg="path_planning" exec="trajectory_planner_astar" name="trajectory_planner_astar" output="screen">
+    <!-- <node pkg="final_challenge_stata" exec="trajectory_planner_astar" name="trajectory_planner_astar" output="screen">
         <param from="$(find-pkg-share path_planning)/config/real/config.yaml"/>
     </node> -->
-    <node pkg="path_planning" exec="trajectory_planner_rrt" name="trajectory_planner_rrt" output="screen">
+    <node pkg="final_challenge_stata" exec="basement_point_publisher" name="basement_point_publisher">
+    </node>
+    <node pkg="final_challenge_stata" exec="trajectory_planner_rrt" name="trajectory_planner_rrt" output="screen">
         <param from="$(find-pkg-share path_planning)/config/real/config.yaml"/>
     </node>
-    <node pkg="path_planning" exec="trajectory_follower" name="trajectory_follower">
+    <node pkg="final_challenge_stata" exec="trajectory_follower" name="trajectory_follower">
         <param from="$(find-pkg-share path_planning)/config/real/config.yaml"/>
     </node>
     <!-- <node pkg="localization" exec="particle_filter" name="particle_filter" output="screen">
         <param from="$(find-pkg-share localization)/config/real/pf_config.yaml"/>
     </node> -->
+    <node pkg="final_challenge_stata" exec="controller_control" name="controller_control">
+    </node>
 </launch>

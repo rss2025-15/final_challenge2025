@@ -103,7 +103,7 @@ class PathPlan(Node):
 
         self.goal_sub = self.create_subscription(
             PoseStamped,
-            "/goal_pose",
+            "/waypoint", # changed this to what control node publishes to
             self.goal_cb,
             10
         )

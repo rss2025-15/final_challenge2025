@@ -2,7 +2,7 @@ import rclpy
 from ackermann_msgs.msg import AckermannDriveStamped
 from geometry_msgs.msg import PoseArray, PoseWithCovarianceStamped, PoseStamped
 from nav_msgs.msg import Odometry
-from std_msgs.msg import Header, Float32
+from std_msgs.msg import Header, Float32, Bool
 from rclpy.node import Node
 from visualization_msgs.msg import Marker
 
@@ -74,9 +74,10 @@ class PurePursuit(Node):
         self.reached_end = False
         self.kill_yourself = False
 
-    # def init_callback(self, init_msg):
-    #     2
-    #     # self.initialized_pose = True
+        self.parking_sub = self.create_subscription(Bool, "/switch_parking", self.parking_cb, 1)
+    
+    def parking_cb(self, parking_msg):
+        if parking_msg.data: self.initialized_traj = False
 
     def pose_callback(self, estimated_robot_msg):
         orientation = euler_from_quaternion([

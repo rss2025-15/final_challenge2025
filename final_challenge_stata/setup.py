@@ -20,6 +20,13 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'trajectory_builder = final_challenge_stata.trajectory_builder:main',
+            'trajectory_loader = final_challenge_stata.trajectory_loader:main',
+            'trajectory_follower = final_challenge_stata.trajectory_follower:main',
+            'trajectory_planner_astar = final_challenge_stata.trajectory_planner_astar:main',
+            'trajectory_planner_rrt = final_challenge_stata.trajectory_planner_rrt:main',
+            'basement_point_publisher = final_challenge_stata.basement_point_publisher:main',
+            'controller_control = final_challenge_stata.controller_control:main'
         ],
     },
 )

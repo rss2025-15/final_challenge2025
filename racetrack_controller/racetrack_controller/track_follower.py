@@ -55,7 +55,7 @@ class TrackFollower(Node):
 
     def odom_callback(self, odom_msg):
         self.odom_speed = -odom_msg.twist.twist.linear.x
-        self.get_logger().info(f'GOT ODOM SPEED: {self.odom_speed}')
+        # self.get_logger().info(f'GOT ODOM SPEED: {self.odom_speed}')
 
     # from safety controller
     def safe_distance_function(self, speed, goal_distance):
@@ -71,8 +71,8 @@ class TrackFollower(Node):
             self.positive_relative_y = self.relative_y
         lookahead = np.linalg.norm([self.relative_x, self.relative_y])
         angle = math.atan2(self.relative_y, self.relative_x)
-        gain = 0.6
-        self.get_logger().info(f"lookahead {lookahead}")
+        gain = 1.0
+        # self.get_logger().info(f"lookahead {lookahead}")
 
         # plan is to follow a circular trajectory to go to the cone (which will be smooth)
         # if the computed radius is smaller than the minimum turning radius of the robot we should also go backwards
@@ -91,21 +91,21 @@ class TrackFollower(Node):
             # self.cmd_speed = max(1.0-math.exp(-self.exp_speed_coeff*(lookahead-self.parking_distance)),self.close_speed)
             self.cmd_speed = 4.0
             self.drive_cmd(gain*steer_angle, self.cmd_speed)
-            self.get_logger().info('FORWARD, STEERING {steer_angle}')
+            # self.get_logger().info('FORWARD, STEERING {steer_angle}')
                     
         elif lookahead < self.parking_distance-self.park_thres or abs(turn_radius) < self.min_turn_radius or abs(angle) > self.angle_thres or self.relative_x < 0:
             # go back and turn
             if self.positive_relative_y > 0:
                 # cone is to the left, go back right
                 self.drive_cmd(-self.max_steer, -1.0)
-                self.get_logger().info('FULL BACK RIGHT')
+                # self.get_logger().info('FULL BACK RIGHT')
             else:
                 # cone right, go back left
                 self.drive_cmd(self.max_steer, -1.0)
-                self.get_logger().info('FULL BACK LEFT')
+                # self.get_logger().info('FULL BACK LEFT')
             self.cmd_speed = -1.0
         else:
-            self.get_logger().info('STOP')
+            # self.get_logger().info('STOP')
             self.stop_cmd()
             self.cmd_speed = 0.0
         

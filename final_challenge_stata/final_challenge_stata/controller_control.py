@@ -1,7 +1,7 @@
 import rclpy
 from rclpy.node import Node
 
-from geometry_msgs.msg import Point, PointStamped, PoseWithCovarianceStamped, Pose, PoseArray
+from geometry_msgs.msg import Point, PointStamped, PoseWithCovarianceStamped, Pose, PoseArray, PoseStamped
 from std_msgs.msg import Int32, Bool
 
 class Control(Node):

@@ -11,7 +11,7 @@ from vs_msgs.msg import ConeLocationPixel, ConeLocation
 from visualization_msgs.msg import Marker, MarkerArray
 
 from sensor_msgs.msg import Image
-
+# import imageio
 from racetrack_cv.visualization_tools import VisualizationTools
 
 from racetrack_cv.zed_source import zed_source
@@ -53,7 +53,9 @@ class LaneDetector(Node):
         self.declare_parameter("lane_width", 0.0)
         self.declare_parameter("lookahead", 1.0)
         self.declare_parameter("close_to_line_thres", 0.0)
-        self.declare_parameter("image_fps", 30)
+        self.declare_parameter("image_fps", 60)
+        self.declare_parameter("going_right", True)
+        self.declare_parameter("offset", 0.0)
 
         self.white_lower_lims = self.get_parameter("white_lower_lims").value
         self.white_upper_lims = self.get_parameter("white_upper_lims").value
@@ -63,6 +65,8 @@ class LaneDetector(Node):
         self.lookahead = self.get_parameter("lookahead").get_parameter_value().double_value
         self.close_to_line_thres = self.get_parameter("close_to_line_thres").get_parameter_value().double_value
         self.image_fps = self.get_parameter("image_fps").get_parameter_value().integer_value
+        self.going_right = self.get_parameter("going_right").get_parameter_value().bool_value
+        self.offset = self.get_parameter("offset").get_parameter_value().double_value
 
         self.get_logger().info(f'WHITE PIXEL HSV LIMITS: {self.white_lower_lims, self.white_upper_lims}')
         
@@ -74,7 +78,7 @@ class LaneDetector(Node):
         self.bridge = CvBridge()
 
         self.zed = zed_source(set_fps=self.image_fps, resize_dim=(640, 360)) # TODO: check if homography works using that resolution or if scaling is different (disproportionate width/height? maybe ROS zed node was cropping and we need to do that too, check FoV)
-
+        # self.video= imageio.get_writer('output_video.mp4', fps=self.image_fps)
         np_pts_ground = np.array(PTS_GROUND_PLANE)
         np_pts_ground = np_pts_ground * METERS_PER_INCH
         np_pts_ground = np.float32(np_pts_ground[:, np.newaxis, :])
@@ -91,7 +95,12 @@ class LaneDetector(Node):
         self.prev_to_right = False
         self.prev_to_left = False
 
+        self.x_real = None
+        self.y_real = None
+
         self.status = 0
+        self.vid_duration=5
+        self.step = 0
 
     # from visual servoing lab
     def transformUvToXy(self, u, v):
@@ -120,6 +129,7 @@ class LaneDetector(Node):
 
     # def image_callback(self, img_msg):
     def image_callback(self):
+        self.step+=1
         # get image and convert to HSV
         # image_cv = self.bridge.imgmsg_to_cv2(img_msg, "bgra8")
 
@@ -146,6 +156,7 @@ class LaneDetector(Node):
         min_y, max_y = int(min_y*hsv_img.shape[1]), int(max_y*hsv_img.shape[1])
         focused_img = hsv_img[min_x:max_x, min_y:max_y]
         mask_bgr = image_cv[min_x:max_x, min_y:max_y].copy()
+        # self.get_logger().info(f"{mask_bgr.shape}")
 
         # filter white pixels
         lower_hsv = np.array(self.white_lower_lims, dtype=np.uint8)
@@ -156,10 +167,10 @@ class LaneDetector(Node):
         # dilate & erode
         kernel = np.ones((3, 3), np.uint8)
         mask = cv2.erode(mask, kernel, iterations=1)
-        mask = cv2.dilate(mask, kernel, iterations=1)
+        # mask = cv2.dilate(mask, kernel, iterations=1)
 
         # Hough transform
-        lines = cv2.HoughLines(mask, 1, np.pi / 180, 125, None, 0, 0)
+        lines = cv2.HoughLines(mask, 1, np.pi / 180, 150, None, 0, 0)
         # mask_rgb = cv2.cvtColor(mask, cv2.COLOR_GRAY2RGB)
         # left_line, right_line = None, None # (r, theta, slope, offset)
         left_line_ground, right_line_ground = None, None # (theta_ground, slope_ground, offset_ground)
@@ -210,18 +221,21 @@ class LaneDetector(Node):
                 if abs(theta_ground) > self.line_angle_limit/180*np.pi:
                     continue
                 
-                if offset_ground > 0 and (left_line_ground is None or abs(left_line_ground[2]) > abs(offset_ground)):
+                
+                if offset_ground > 0 and (left_line_ground is None or ((self.going_right and left_line_ground[0] > theta_ground) or ((not self.going_right) and left_line_ground[0] < theta_ground))):
                     left_line_ground = (theta_ground, slope_ground, offset_ground)
                     offset_left = offset_ground
+                    theta_left = theta_ground
                     slope_img_left = slope
                     offset_img_left = offset
                     slope_left = slope_ground
                     closest_left = closest
                     furthest_left = furthest
                     # self.get_logger().info(f'FOUND ONE LEFT: {left_line_ground}')
-                if offset_ground < 0 and (right_line_ground is None or abs(right_line_ground[2]) > abs(offset_ground)):
+                if offset_ground < 0 and (right_line_ground is None or ((self.going_right and right_line_ground[0] > theta_ground) or ((not self.going_right) and right_line_ground[0] < theta_ground))):
                     right_line_ground = (theta_ground, slope_ground, offset_ground)
                     offset_right = offset_ground
+                    theta_right = theta_ground
                     slope_img_right = slope
                     offset_img_right = offset
                     slope_right = slope_ground
@@ -314,29 +328,46 @@ class LaneDetector(Node):
                 if close_left or far_right:
                     to_left = True
 
-                if self.prev_to_left and to_right:
-                    # went left
-                    self.status -= 1
-                elif self.prev_to_right and to_left:
-                    # went right
-                    self.status += 1
+                # if self.prev_to_left and to_right:
+                #     # went left
+                #     self.status -= 1
+                # elif self.prev_to_right and to_left:
+                #     # went right
+                #     self.status += 1
+
+                # if dist_left is not None and dist_left > (1-self.close_to_line_thres)*self.lane_width and self.prev_dist_left is not None and self.prev_dist_left < self.close_to_line_thres*self.lane_width:
+                #     # went left
+                #     self.status -= 1
+                # elif dist_right is not None and dist_right > (1-self.close_to_line_thres)*self.lane_width and self.prev_dist_right is not None and self.prev_dist_right < self.close_to_line_thres*self.lane_width:
+                #     # went right
+                #     self.status += 1
 
                 # logic for finding goal point between lines (or offset from one if only one found) using the projected lanes
-
+                # self.get_logger().info(f'LANE: {self.status}')
+                # self.get_logger().info(f'TO LEFT: {to_left}')
+                # self.get_logger().info(f'TO RIGHT: {to_right}')
+                # self.get_logger().info(f'PREVIOUSLY TO LEFT: {self.prev_to_left}')
+                # self.get_logger().info(f'PREVIOUSLY TO RIGHT: {self.prev_to_right}')
                 if self.status == 0:
                     # stayed in lane
                     if left_line_ground is not None and right_line_ground is not None:
                         # find middle line
-                        slope_mid = (slope_left+slope_right)/2
+                        # slope_mid = (slope_left+slope_right)/2
+                        theta_mid = (theta_left+theta_right)/2
+                        slope_mid = math.tan(theta_mid)
                         offset_mid = (offset_left+offset_right)/2
+                        # offset_mid = offset_mid - self.offset*math.sqrt(slope_mid**2+1)
+                        offset_mid = offset_mid - self.offset
                     elif right_line_ground is None:
                         # only left, offset by distance
                         slope_mid = slope_left
-                        offset_mid = offset_left - self.lane_width*math.sqrt(slope_mid**2+1)/2
+                        # offset_mid = offset_left - (self.lane_width/2.0+self.offset)*math.sqrt(slope_mid**2+1)
+                        offset_mid = offset_left - (self.lane_width/2.0)*math.sqrt(slope_mid**2+1) - self.offset
                     elif left_line_ground is None:
                         # only right
                         slope_mid = slope_right
-                        offset_mid = offset_right + self.lane_width*math.sqrt(slope_mid**2+1)/2
+                        # offset_mid = offset_right + (self.lane_width/2.0-self.offset)*math.sqrt(slope_mid**2+1)/2
+                        offset_mid = offset_right + (self.lane_width/2.0)*math.sqrt(slope_mid**2+1) - self.offset
                 elif self.status < 0:
                     # went left, put goal to right
                     if left_line_ground is not None and right_line_ground is not None:
@@ -367,27 +398,45 @@ class LaneDetector(Node):
                         offset_mid = offset_right + 3*self.lane_width*math.sqrt(slope_mid**2+1)/2
 
                 # lookahead is from start of the line not from robot, to hopefully make recovery smoother (also easier math for me)
-                x_real, y_real = self.lookahead/math.sqrt(slope_mid**2+1), slope_mid*self.lookahead/math.sqrt(slope_mid**2+1)+offset_mid
+                self.x_real, self.y_real = self.lookahead/math.sqrt(slope_mid**2+1), slope_mid*self.lookahead/math.sqrt(slope_mid**2+1)+offset_mid
 
-                marker_arr.markers.append(VisualizationTools.plot_line([0.0, x_real], [offset_mid, y_real], 2, (0.0, 0.0, 1.0)))
+                marker_arr.markers.append(VisualizationTools.plot_line([0.0, self.x_real], [offset_mid, self.y_real], 2, (0.0, 0.0, 1.0)))
 
-                relative_xy_msg = ConeLocation()
-                relative_xy_msg.x_pos = x_real
-                relative_xy_msg.y_pos = y_real
-
-                self.cone_pub.publish(relative_xy_msg)
-                marker_arr.markers.append(self.draw_marker(x_real, y_real, "base_link", 3))
-                self.marker_pub.publish(marker_arr)
+                marker_arr.markers.append(self.draw_marker(self.x_real, self.y_real, "base_link", 3))
 
                 self.prev_to_left = to_left
                 self.prev_to_right = to_right
+
+                if dist_left is not None:
+                    self.prev_dist_left = dist_left
+                if dist_right is not None:
+                    self.prev_dist_right = dist_right
+            
+            if self.x_real is not None:
+                relative_xy_msg = ConeLocation()
+                relative_xy_msg.x_pos = self.x_real
+                relative_xy_msg.y_pos = self.y_real
+                self.cone_pub.publish(relative_xy_msg)
+
+            self.marker_pub.publish(marker_arr)
+
 
         # debug_msg = self.bridge.cv2_to_imgmsg(mask, "8UC1")
         # debug_msg = self.bridge.cv2_to_imgmsg(mask_rgb, "rgb8")
         debug_msg = self.bridge.cv2_to_imgmsg(mask_bgr, "bgr8")
 
         self.debug_pub.publish(debug_msg)
-    
+        # self.get_logger().info(f"{mask_bgr.shape}")
+        # mask_rgb=cv2.cvtColor(mask_bgr, cv2.COLOR_BGR2RGB)
+        # mask_rgb = mask_rgb.astype('uint8')
+
+        # if self.step<self.vid_duration*self.image_fps:
+        #     self.video.append_data(frame)
+
+        # self.get_logger().info(f"{self.step}")
+        # if self.step==self.vid_duration*self.image_fps:
+        #     self.video.release()
+        #     self.get_logger().info('video saved')
     # from visual servoing lab
     def draw_marker(self, cone_x, cone_y, message_frame, id):
         """
@@ -409,7 +458,11 @@ class LaneDetector(Node):
         marker.pose.position.x = cone_x
         marker.pose.position.y = cone_y
         return marker
-
+def destroy_node(self):
+    if self.video is not None:
+        self.video.close()
+        self.get_logger().info('video saved')
+    super().destroy_node()
 def main():
     rclpy.init()
     lane_detector = LaneDetector()

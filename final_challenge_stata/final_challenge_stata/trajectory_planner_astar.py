@@ -9,7 +9,7 @@ import numpy as np
 import heapq
 import math
 import cv2
-import imageio
+# import imageio
 import sys
 
 np.set_printoptions(threshold=sys.maxsize)
@@ -42,7 +42,7 @@ class PathPlan(Node):
 
         self.goal_sub = self.create_subscription(
             PoseStamped,
-            "/goal_pose",
+            "/waypoint",
             self.goal_cb,
             10
         )
@@ -80,7 +80,7 @@ class PathPlan(Node):
         self.DOWNSAMPLED_ROWS = None
         self.DOWNSAMPLED_COLS = None
         self.pos = (0, 0)
-        self.dilation = 5
+        self.dilation = 12
         self.map_initialized = False
 
 
@@ -121,8 +121,8 @@ class PathPlan(Node):
     
     def pose_estimate_cb(self, odom):
         self.pos = (odom.pose.pose.position.x, odom.pose.pose.position.y)
-        self.get_logger().info("Pose received")
-        # self.trajectory.clear()
+        # self.get_logger().info("Pose received")
+        self.trajectory.clear()
 
     def goal_cb(self, msg):
         self.goal = (msg.pose.position.x, msg.pose.position.y)

@@ -2,7 +2,7 @@ import rclpy
 from rclpy.node import Node
 
 from cv_bridge import CvBridge
-
+import cv2
 from sensor_msgs.msg import Image
 from ackermann_msgs.msg import AckermannDriveStamped, AckermannDrive
 from geometry_msgs.msg import Point, PointStamped, Pose, PoseArray, PoseStamped
@@ -10,159 +10,241 @@ from tf_transformations import quaternion_from_euler, euler_from_quaternion
 from vs_msgs.msg import ConeLocation, ConeLocationPixel
 import numpy as np
 import math
-# from .detector import Detector
+from final_challenge_stata.detector import Detector
+from std_msgs.msg import Int32, Bool
 
-#In real world i am =assuming opinits give no n rviz would be here right?
-# so we should have an idea of what x and y we are heading towards
-# this would help me find whatever is needed for model type and see if I detect then I can kick in rigjt
-#this node does not even need any homography transformation what soeevr, sohoudl eb able to get point from controller/
-#trajectory follower lets see how the integration happens
+
 class DetectorNode(Node):
     def __init__(self):
         super().__init__("detector")
-        # self.detector = Detector()
-        # self.publisher = None #TODO
-        # self.subscriber = self.create_subscription(Image, "/zed/zed_node/rgb/image_rect_color", self.callback, 1)
-        # self.bridge = CvBridge()
+
         ####
-        self.drive_topic = "/drive"
+        self.drive_topic = "/vesc/low_level/input/navigation"
         self.lookahead = 2.0  # FILL IN #
         self.speed = 0.5  # FILL IN #
         self.wheelbase_length = .46  # FILL IN #
+        self.max_steer = 0.78
+        self.angle_thres = np.pi/6.0
         self.odom_topic =  "/odom"
         self.target_x = None
         self.target_y = None
         self.start_time = None
+        self.min_turn_radius = self.wheelbase_length/math.tan(self.max_steer)
 
         self.bridge = CvBridge()
 
+        ###Detector
+        self.detector = Detector()
+        self.detector.set_threshold(0.05)
         ####
-
+        self.send_drive_command = True
+        self.last_switch_command = True
+        self.detect = False
+        self.shrinkray_count = 1
+        self.detection_valid_time = None
+        self.detection_valid_thres = 1.5
+        self.start_searching = False
+        # switch
+        # Bool, /switch_parking
+        # /shrinkray_count
+        # / Int32
 
         ####
-
 
         ###subscribers
 
-        self.subscriber = self.create_subscription(PointStamped, "/clicked_point", self.callback, 1)
-        self.robot_pose_subscriber = self.create_subscription(ConeLocation, '/estimated_robot', self.pose_callback, 1)
-        self.homography_subscriber = self.create_subscription(PoseStamped, '/relative_cone', self.homography_callback, 1)
+        self.homography_subscriber = self.create_subscription(ConeLocation, '/relative_cone', self.homography_callback, 1)
         self.camera_subscriber = self.create_subscription(Image, "/zed/zed_node/rgb/image_rect_color", self.camera_callback, 1)
+        self.start_detection_subscriber = self.create_subscription(Bool, 'start_detection',self.start_detection_callback,  1)
+        self.start_searching_subscriber = self.create_subscription(Bool, 'start_searching',self.start_searching_callback,  1)
+        self.react_timer = self.create_timer(1/30.0, self.react_callback)
 
         ###publishers
         self.pixel_publisher = self.create_publisher(ConeLocationPixel, "/relative_cone_px", 10)
         self.drive_pub = self.create_publisher(AckermannDriveStamped, self.drive_topic, 10)
+        self.debug_pub = self.create_publisher(Image, "/cone_debug_img", 10)
+        self.switch_pub = self.create_publisher(Bool, '/switch_parking', 1)
+        self.shrinkray_count_pub = self.create_publisher(Int32, '/shrinkray_count', 1)
         ###
 
         ####
         self.get_logger().info("Detector Initialized")
-# odom_topic:
-
-    # def callback(self, img_msg):
-    #     # Process image with CV Bridge
-    #     # image = self.bridge.imgmsg_to_cv2(img_msg, "bgr8")
-
-    #     #TODO:
-    #     1
-
-    #when should we put the relative cone_px angle? it should be done during the camera callback actually i THINK
-
-
-    def callback(self, point_msg: PointStamped):
-        # Process image with CV Bridge
-        # image = self.bridge.imgmsg_to_cv2(img_msg, "bgr8")
-
-        #TODO:
-        #everything will initially be in world frame
-        #i will need to change from world frame to real frame
-        x,y = point_msg.point.x, point_msg.point.y
-
-        #lets convert these to robot frame now
-        #lets get the robot position here as well from base link
-        self.target_x = x
-        self.target_y = y
-
-        self.get_logger().info(f'target x received as {self.target_x}')
-        self.get_logger().info(f'target y received as {self.target_y}')
 
     def camera_callback(self, camera_msg):
-
         # extract the image out of camera msg
         image = self.bridge.imgmsg_to_cv2(camera_msg, "bgr8")
+        #pass this image to the detector for predictions
+        results = self.detector.predict(image)
+        predictions = results["predictions"]
+        # self.get_logger().info('outside loop')
+        #format
+        #((356.390625, 110.8359375, 448.921875, 171.703125), 'banana')
+        for prediction in predictions:
+            # self.get_logger().info(f'predicion is {prediction}')
 
-        #one we have the image we can run our detector to give bounding box of our image
-        cone_pixel = ConeLocationPixel()
-        cone_pixel.u = float(x_pixel)
-        cone_pixel.v = float(y_pixel)
-        self.pixel_publisher.publish(cone_pixel)
+            if prediction[1] == 'banana':
+                    # return if we are not supposed to be detecting right now
+                if not self.detect:
+                    self.get_logger().info('self.detect is turned off rn')
+                    return
+                #if last switch command was True only then publish message to switch
+                self.get_logger().info('Sending Switch Command of True')
 
+                #turn off the regular follower
+                self.switch_cmd(True)
+
+                # detector returns (xmin, ymin, xmax, ymax)
+                x1_f, y1_f, x2_f, y2_f = prediction[0]
+
+                x1, y1, x2, y2 = map(int, (x1_f, y1_f, x2_f, y2_f))
+                self.get_logger().info(f'rectangle_box is {x1,x2,y1,y2}'  )
+
+                middle_x_pixel = (x1 + x2) // 2
+                bottom_y_pixel = y2
+                #####debug
+                # add box around orig image
+                cv2.rectangle(image, (x1,y1), (x2, y2), (0,255,0), 2)
+                cv2.putText(image, "FPS: not determined ", (10,30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255,255,255), 2)
+
+                debug_msg = self.bridge.cv2_to_imgmsg(image, "bgr8")
+                # self.get_logger().info(f"{cone_pixel.u, cone_pixel.v}")
+                self.debug_pub.publish(debug_msg)
+
+                ####debug
+
+                middle_x_pixel = (x1+x2)//2
+                bottom_y_pixel = y2
+                self.get_logger().info(f'The middle x pixel: {middle_x_pixel}')
+                self.get_logger().info(f'The bottom y pixel: {bottom_y_pixel}')
+                cone_pixel = ConeLocationPixel()
+                cone_pixel.u = float(middle_x_pixel)
+                cone_pixel.v = float(bottom_y_pixel)
+                self.pixel_publisher.publish(cone_pixel)
 
         #assume we finally have the x and y pixels
 
     def homography_callback(self, position_msg: ConeLocation ):
+        if not self.detect:
+            return
         self.target_x = position_msg.x_pos
         self.target_y = position_msg.y_pos
         self.get_logger().info(f'target x received as {self.target_x}')
         self.get_logger().info(f'target y received as {self.target_y}')
+        self.detection_valid_time = self.get_clock().now().nanoseconds*float(10**-9)
+
+    def react_callback(self):
+        # self.get_logger().info(f'DETECT: {self.detect}')
+        if not self.detect:
+            return
+        if self.start_searching and self.detection_valid_time is None:
+            # go in circles
+            self.switch_cmd(True)
+            self.drive_cmd(self.max_steer, -0.7)
+            self.get_logger().info('FULL BACK LEFT')
+            return
+        elif self.detection_valid_time is None:
+            return
+        
+        self.switch_cmd(True)
+        
+        curr_time = self.get_clock().now().nanoseconds*float(10**-9)
 
         #pose call back should continue working as it is right now
 
-
-    def pose_callback(self, estimated_robot_msg):
-        # self.get_logger().info(f'in pose call back')
-        #return if target x and target y not received
-        if not (self.target_x or self.target_y):
-            return
-
-
-        orientation = euler_from_quaternion([
-        estimated_robot_msg.pose.orientation.x,
-        estimated_robot_msg.pose.orientation.y,
-        estimated_robot_msg.pose.orientation.z,
-        estimated_robot_msg.pose.orientation.w
-        ])[-1]
-
-        robot_pose = np.array([
-            estimated_robot_msg.pose.position.x,
-            estimated_robot_msg.pose.position.y,
-            orientation
-        ])
-
-        pts = np.array([self.target_x, self.target_y])
-        lookahead_angle = math.atan2(pts[1]-robot_pose[1], pts[0] - robot_pose[0])
-        angle_in_robot_frame = self.relative_angle_rad(lookahead_angle, robot_pose[2])
-
         #lets find distance between robot and target point
-        target_distance = math.sqrt((robot_pose[0]-self.target_x)**2 + (robot_pose[1] - self.target_y)**2)
-        self.get_logger().info(f'distance of robot from target point is {target_distance}')
+        # target_distance = math.sqrt((self.target_x)**2 + (self.target_y)**2)
+        # self.get_logger().info(f'distance of robot from target point is {target_distance}')
 
-        turn_radius = target_distance / (2*math.sin(angle_in_robot_frame))
-        steer_angle = math.atan(self.wheelbase_length/turn_radius)
-        self.cmd_speed = 1.0
+        # angle_in_robot_frame = math.atan2(self.target_y, self.target_x)
+        # self.get_logger().info(f'angle in robot frame is  is {angle_in_robot_frame}')
 
+        # turn_radius = target_distance / (2*math.sin(angle_in_robot_frame))
+        # steer_angle = math.atan(self.wheelbase_length/turn_radius)
+        self.cmd_speed = 0.7
 
-        if target_distance > 0.5:
+        self.relative_x = self.target_x
+        self.relative_y = self.target_y
+        
+        lookahead = np.linalg.norm([self.relative_x, self.relative_y])
+        angle = math.atan2(self.relative_y, self.relative_x)
+        # gain = 1.
+        self.get_logger().info(f"lookahead {lookahead}")
+
+        turn_radius = lookahead / (2*math.sin(math.atan2(self.relative_y,self.relative_x)))
+
+        if lookahead > 1.0 and abs(turn_radius) >= self.min_turn_radius and (curr_time-self.detection_valid_time <= self.detection_valid_thres):
+            steer_angle = math.atan(self.wheelbase_length/turn_radius)
+
             self.drive_cmd(steer_angle, self.cmd_speed)
+            self.get_logger().info('FORWARD, STEERING {steer_angle}')
+                    
+        # elif abs(turn_radius) < self.min_turn_radius or abs(angle) > self.angle_thres or (curr_time-self.detection_valid_time > self.detection_valid_thres):
+        elif abs(turn_radius) < self.min_turn_radius or abs(angle) > self.angle_thres and (curr_time-self.detection_valid_time <= self.detection_valid_thres):
+            # go back and turn
+            if self.relative_y > 0:
+                # cone is to the left, go back right
+                self.drive_cmd(-self.max_steer, -0.7)
+                self.get_logger().info('FULL BACK RIGHT')
+            else:
+                # cone right, go back left
+                self.drive_cmd(self.max_steer, -0.7)
+                self.get_logger().info('FULL BACK LEFT')
         else:
-            #the car stops moving for 5 seconds and then continues to move
+            self.drive_cmd(0.0, 0.0)
+            # the car stops moving for 5 seconds and then continues to move
             if not self.start_time:
                  self.start_time = self.get_clock().now().nanoseconds*10**-9
             self.get_logger().info(f'start time is {self.start_time}')
             self.get_logger().info(f'current time is {self.get_clock().now().nanoseconds*10**-9}')
             if self.get_clock().now().nanoseconds*10**-9 - self.start_time < 5:
-                self.drive_cmd(steer_angle, 0.0)
-            else:
-                 self.drive_cmd(steer_angle, self.cmd_speed)
+                return
 
-    def normalize_angle_rad(self, angle):
-            """ Normalize angle to [-π, π) radians """
-            return (angle + np.pi) % (2 * np.pi) - np.pi
+            self.get_logger().info(f'end time is {self.get_clock().now().nanoseconds*10**-9}')
+            ##if target distance is less than 0.5 m then send the switch command again
 
-    def relative_angle_rad(self, object_angle, robot_angle):
-            return self.normalize_angle_rad(object_angle - robot_angle)
+            self.get_logger().info(f'Publishing SHRINK ray count of {self.shrinkray_count} ')
+            self.shrink_count_cmd(self.shrinkray_count)
+            #stop publishing
+            self.get_logger().info('turning self.detect to false')
+            self.detect = False
+            self.start_searching = False
+            self.shrinkray_count = 2
+        
+        # self.get_logger().info('i am now capable of publishing commands')
+        # if target_distance > 1.0:
+        #     self.drive_cmd(steer_angle, self.cmd_speed)
+        # else:
+            # self.drive_cmd(steer_angle, 0.0)
+            # # the car stops moving for 5 seconds and then continues to move
+            # if not self.start_time:
+            #      self.start_time = self.get_clock().now().nanoseconds*10**-9
+            # self.get_logger().info(f'start time is {self.start_time}')
+            # self.get_logger().info(f'current time is {self.get_clock().now().nanoseconds*10**-9}')
+            # if self.get_clock().now().nanoseconds*10**-9 - self.start_time < 5:
+
+            #     return
+
+            # self.get_logger().info(f'end time is {self.get_clock().now().nanoseconds*10**-9}')
+            # ##if target distance is less than 0.5 m then send the switch command again
+
+            # self.get_logger().info(f'Publishing SHRINK ray count of {self.shrinkray_count} ')
+            # self.shrink_count_cmd(self.shrinkray_count)
+            # #stop publishing
+            # self.get_logger().info('turning self.detect to false')
+            # self.detect = False
+            # self.shrinkray_count = 2
+
+    def start_detection_callback(self, bool_msg):
+        self.get_logger().info('bool msg received')
+        if self.detect == False:
+            self.get_logger().info(f'turning self.detect to {bool_msg.data}')
+            self.detect = bool_msg.data
+            self.start_time = None
+
+    def start_searching_callback(self, bool_msg):
+        self.start_searching = bool_msg.data
 
     def drive_cmd(self, steer, speed = 1.0):
-
 
             drive_cmd_drive = AckermannDriveStamped()
 
@@ -180,6 +262,15 @@ class DetectorNode(Node):
 
             self.drive_pub.publish(drive_cmd_drive)
 
+    def switch_cmd(self, flag:bool):
+        msg = Bool()
+        msg.data = flag
+        self.switch_pub.publish(msg)
+
+    def shrink_count_cmd (self, count):
+        msg = Int32()
+        msg.data = count
+        self.shrinkray_count_pub.publish(msg)
 
 def main(args=None):
     rclpy.init(args=args)

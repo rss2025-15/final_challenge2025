@@ -1,5 +1,8 @@
-from .detector import Detector
+from detector import Detector
 from PIL import Image, ImageDraw, ImageFont
+import os
+import numpy as np
+import cv2
 
 # detector = Detector()
 

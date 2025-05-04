@@ -31,7 +31,8 @@ setup(
             'trajectory_planner_rrt = final_challenge_stata.trajectory_planner_rrt:main',
             'basement_point_publisher = final_challenge_stata.basement_point_publisher:main',
             'controller_control = final_challenge_stata.controller_control:main',
-            'pickup_controller = final_challenge_stata.pickup_controller:main'
+            'pickup_controller = final_challenge_stata.pickup_controller:main',
+            'traffic_controller = final_challenge_stata.traffic_controller:main'
         ],
     },
 )

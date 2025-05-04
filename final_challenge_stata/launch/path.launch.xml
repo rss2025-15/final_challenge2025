@@ -25,7 +25,7 @@
     </node>
 
     <node pkg="localization" exec="particle_filter" name="particle_filter" output="screen">
-        <param from="$(find-pkg-share localization)/config/real/pf_config.yaml"/>
+        <param from="$(find-pkg-share localization)/real_params.yaml"/>
     </node>
 
 </launch>

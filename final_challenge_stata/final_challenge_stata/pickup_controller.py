@@ -24,10 +24,12 @@ class DetectorNode(Node):
         self.speed = 0.5  # FILL IN #
         self.wheelbase_length = .46  # FILL IN #
         self.max_steer = 0.78
+        self.angle_thres = np.pi/6.0
         self.odom_topic =  "/odom"
         self.target_x = None
         self.target_y = None
         self.start_time = None
+        self.min_turn_radius = self.wheelbase_length/math.tan(self.max_steer)
 
         self.bridge = CvBridge()
 
@@ -37,8 +39,11 @@ class DetectorNode(Node):
         ####
         self.send_drive_command = True
         self.last_switch_command = True
-        self.detect = True
+        self.detect = False
         self.shrinkray_count = 1
+        self.detection_valid_time = None
+        self.detection_valid_thres = 1.5
+        self.start_searching = False
         # switch
         # Bool, /switch_parking
         # /shrinkray_count
@@ -51,6 +56,8 @@ class DetectorNode(Node):
         self.homography_subscriber = self.create_subscription(ConeLocation, '/relative_cone', self.homography_callback, 1)
         self.camera_subscriber = self.create_subscription(Image, "/zed/zed_node/rgb/image_rect_color", self.camera_callback, 1)
         self.start_detection_subscriber = self.create_subscription(Bool, 'start_detection',self.start_detection_callback,  1)
+        self.start_searching_subscriber = self.create_subscription(Bool, 'start_searching',self.start_searching_callback,  1)
+        self.react_timer = self.create_timer(1/30.0, self.react_callback)
 
         ###publishers
         self.pixel_publisher = self.create_publisher(ConeLocationPixel, "/relative_cone_px", 10)
@@ -123,6 +130,24 @@ class DetectorNode(Node):
         self.target_y = position_msg.y_pos
         self.get_logger().info(f'target x received as {self.target_x}')
         self.get_logger().info(f'target y received as {self.target_y}')
+        self.detection_valid_time = self.get_clock().now().nanoseconds*float(10**-9)
+
+    def react_callback(self):
+        # self.get_logger().info(f'DETECT: {self.detect}')
+        if not self.detect:
+            return
+        if self.start_searching and self.detection_valid_time is None:
+            # go in circles
+            self.switch_cmd(True)
+            self.drive_cmd(self.max_steer, -0.7)
+            self.get_logger().info('FULL BACK LEFT')
+            return
+        elif self.detection_valid_time is None:
+            return
+        
+        self.switch_cmd(True)
+        
+        curr_time = self.get_clock().now().nanoseconds*float(10**-9)
 
         #pose call back should continue working as it is right now
 
@@ -135,14 +160,10 @@ class DetectorNode(Node):
 
         # turn_radius = target_distance / (2*math.sin(angle_in_robot_frame))
         # steer_angle = math.atan(self.wheelbase_length/turn_radius)
-        self.cmd_speed = 0.6
+        self.cmd_speed = 0.7
 
         self.relative_x = self.target_x
         self.relative_y = self.target_y
-        
-        if self.relative_x > 0:
-            self.positive_relative_x = self.relative_x
-            self.positive_relative_y = self.relative_y
         
         lookahead = np.linalg.norm([self.relative_x, self.relative_y])
         angle = math.atan2(self.relative_y, self.relative_x)
@@ -151,25 +172,25 @@ class DetectorNode(Node):
 
         turn_radius = lookahead / (2*math.sin(math.atan2(self.relative_y,self.relative_x)))
 
-        if lookahead > 1.0 and abs(turn_radius) >= self.min_turn_radius and self.relative_x > 0:
-            steer_angle = math.atan(self.wheelbase/turn_radius)
+        if lookahead > 1.0 and abs(turn_radius) >= self.min_turn_radius and (curr_time-self.detection_valid_time <= self.detection_valid_thres):
+            steer_angle = math.atan(self.wheelbase_length/turn_radius)
 
             self.drive_cmd(steer_angle, self.cmd_speed)
             self.get_logger().info('FORWARD, STEERING {steer_angle}')
                     
-        elif abs(turn_radius) < self.min_turn_radius or abs(angle) > self.angle_thres or self.relative_x < 0:
+        # elif abs(turn_radius) < self.min_turn_radius or abs(angle) > self.angle_thres or (curr_time-self.detection_valid_time > self.detection_valid_thres):
+        elif abs(turn_radius) < self.min_turn_radius or abs(angle) > self.angle_thres and (curr_time-self.detection_valid_time <= self.detection_valid_thres):
             # go back and turn
-            if self.positive_relative_y > 0:
+            if self.relative_y > 0:
                 # cone is to the left, go back right
-                self.drive_cmd(-self.max_steer, -0.6)
+                self.drive_cmd(-self.max_steer, -0.7)
                 self.get_logger().info('FULL BACK RIGHT')
             else:
                 # cone right, go back left
-                self.drive_cmd(self.max_steer, -0.6)
+                self.drive_cmd(self.max_steer, -0.7)
                 self.get_logger().info('FULL BACK LEFT')
-            self.cmd_speed = -1.0
         else:
-            self.drive_cmd(steer_angle, 0.0)
+            self.drive_cmd(0.0, 0.0)
             # the car stops moving for 5 seconds and then continues to move
             if not self.start_time:
                  self.start_time = self.get_clock().now().nanoseconds*10**-9
@@ -186,6 +207,7 @@ class DetectorNode(Node):
             #stop publishing
             self.get_logger().info('turning self.detect to false')
             self.detect = False
+            self.start_searching = False
             self.shrinkray_count = 2
         
         # self.get_logger().info('i am now capable of publishing commands')
@@ -218,6 +240,9 @@ class DetectorNode(Node):
             self.get_logger().info(f'turning self.detect to {bool_msg.data}')
             self.detect = bool_msg.data
             self.start_time = None
+
+    def start_searching_callback(self, bool_msg):
+        self.start_searching = bool_msg.data
 
     def drive_cmd(self, steer, speed = 1.0):
 

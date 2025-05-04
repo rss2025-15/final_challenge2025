@@ -76,6 +76,7 @@ class PurePursuit(Node):
 
         self.parking_sub = self.create_subscription(Bool, "/switch_parking", self.parking_cb, 1)
         self.start_detection_pub = self.create_publisher(Bool, "/start_detection", 1)
+        self.start_searching_pub = self.create_publisher(Bool, "/start_searching", 1)
 
 
     def parking_cb(self, parking_msg):
@@ -230,7 +231,7 @@ class PurePursuit(Node):
 
             ### CHECKING DISTANCE TO END
             dist_to_end = np.linalg.norm([self.trajectory.points[-1][0] - robot_pose[0], self.trajectory.points[-1][1] - robot_pose[1]])
-            if dist_to_end <= 5:
+            if dist_to_end <= 3:
                 start_detection = Bool()
                 start_detection.data = True
                 self.get_logger().info("start detecting now")
@@ -245,6 +246,11 @@ class PurePursuit(Node):
                 time_to_finish_msg.data = time_to_finish
                 self.time_to_finish_pub.publish(time_to_finish_msg)
                 self.kill_yourself = True
+
+                start_searching = Bool()
+                start_searching.data = True
+                self.get_logger().info("start searching now")
+                self.start_searching_pub.publish(start_searching)
 
                 self.drive_cmd(0.0, 0.0)
                 return

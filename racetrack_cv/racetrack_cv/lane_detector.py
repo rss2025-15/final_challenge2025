@@ -129,7 +129,7 @@ class LaneDetector(Node):
 
     # def image_callback(self, img_msg):
     def image_callback(self):
-        self.step+=1
+        # self.step+=1
         # get image and convert to HSV
         # image_cv = self.bridge.imgmsg_to_cv2(img_msg, "bgra8")
 
@@ -421,9 +421,9 @@ class LaneDetector(Node):
             self.marker_pub.publish(marker_arr)
 
 
-        # debug_msg = self.bridge.cv2_to_imgmsg(mask, "8UC1")
+        debug_msg = self.bridge.cv2_to_imgmsg(mask, "8UC1")
         # debug_msg = self.bridge.cv2_to_imgmsg(mask_rgb, "rgb8")
-        debug_msg = self.bridge.cv2_to_imgmsg(mask_bgr, "bgr8")
+        # debug_msg = self.bridge.cv2_to_imgmsg(mask_bgr, "bgr8")
 
         self.debug_pub.publish(debug_msg)
         # self.get_logger().info(f"{mask_bgr.shape}")
@@ -458,11 +458,11 @@ class LaneDetector(Node):
         marker.pose.position.x = cone_x
         marker.pose.position.y = cone_y
         return marker
-def destroy_node(self):
-    if self.video is not None:
-        self.video.close()
-        self.get_logger().info('video saved')
-    super().destroy_node()
+# def destroy_node(self):
+#     if self.video is not None:
+#         self.video.close()
+#         self.get_logger().info('video saved')
+#     super().destroy_node()
 def main():
     rclpy.init()
     lane_detector = LaneDetector()

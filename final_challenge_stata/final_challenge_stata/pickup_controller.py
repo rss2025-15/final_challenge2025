@@ -35,7 +35,7 @@ class DetectorNode(Node):
 
         ###Detector
         self.detector = Detector()
-        self.detector.set_threshold(0.05)
+        self.detector.set_threshold(0.25)
         ####
         self.send_drive_command = True
         self.last_switch_command = True
@@ -104,7 +104,7 @@ class DetectorNode(Node):
                 #####debug
                 # add box around orig image
                 cv2.rectangle(image, (x1,y1), (x2, y2), (0,255,0), 2)
-                cv2.putText(image, "FPS: not determined ", (10,30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255,255,255), 2)
+                cv2.putText(image, " ", (10,30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255,255,255), 2)
 
                 debug_msg = self.bridge.cv2_to_imgmsg(image, "bgr8")
                 # self.get_logger().info(f"{cone_pixel.u, cone_pixel.v}")
@@ -144,9 +144,9 @@ class DetectorNode(Node):
             return
         elif self.detection_valid_time is None:
             return
-        
+
         self.switch_cmd(True)
-        
+
         curr_time = self.get_clock().now().nanoseconds*float(10**-9)
 
         #pose call back should continue working as it is right now
@@ -164,7 +164,7 @@ class DetectorNode(Node):
 
         self.relative_x = self.target_x
         self.relative_y = self.target_y
-        
+
         lookahead = np.linalg.norm([self.relative_x, self.relative_y])
         angle = math.atan2(self.relative_y, self.relative_x)
         # gain = 1.
@@ -177,7 +177,7 @@ class DetectorNode(Node):
 
             self.drive_cmd(steer_angle, self.cmd_speed)
             self.get_logger().info('FORWARD, STEERING {steer_angle}')
-                    
+
         # elif abs(turn_radius) < self.min_turn_radius or abs(angle) > self.angle_thres or (curr_time-self.detection_valid_time > self.detection_valid_thres):
         elif abs(turn_radius) < self.min_turn_radius or abs(angle) > self.angle_thres and (curr_time-self.detection_valid_time <= self.detection_valid_thres):
             # go back and turn
@@ -205,11 +205,11 @@ class DetectorNode(Node):
             self.get_logger().info(f'Publishing SHRINK ray count of {self.shrinkray_count} ')
             self.shrink_count_cmd(self.shrinkray_count)
             #stop publishing
-            self.get_logger().info('turning self.detect to false')
+            # self.get_logger().info('turning self.detect to false')
             self.detect = False
             self.start_searching = False
             self.shrinkray_count = 2
-        
+
         # self.get_logger().info('i am now capable of publishing commands')
         # if target_distance > 1.0:
         #     self.drive_cmd(steer_angle, self.cmd_speed)
@@ -237,7 +237,7 @@ class DetectorNode(Node):
     def start_detection_callback(self, bool_msg):
         self.get_logger().info('bool msg received')
         if self.detect == False:
-            self.get_logger().info(f'turning self.detect to {bool_msg.data}')
+            # self.get_logger().info(f'turning self.detect to {bool_msg.data}')
             self.detect = bool_msg.data
             self.start_time = None
 

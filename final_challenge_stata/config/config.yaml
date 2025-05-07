@@ -31,3 +31,12 @@ trajectory_follower:
   ros__parameters:
     odom_topic: "/vesc/odom"
     drive_topic: "/vesc/low_level/input/navigation"
+safety_controller:
+  ros__parameters:
+    scan_topic: "/scan"
+    drive_topic: "/vesc/low_level/input/navigation"
+    safety_topic: "/vesc/low_level/input/safety"
+    goal_distance: .5
+    bound_angle: 10.0
+    left_right_angle: 20.0
+    max_steer: 0.78

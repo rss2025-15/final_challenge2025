@@ -28,4 +28,11 @@
         <param from="$(find-pkg-share localization)/real_params.yaml"/>
     </node>
 
+    <node pkg="final_challenge_stata" exec="safety_controller" name="safety_controller" output="screen">
+        <param from="$(find-pkg-share final_challenge_stata)/config/config.yaml"/>
+    </node>
+
+    <node pkg="final_challenge_stata" exec="traffic_controller" name="traffic_controller" output="screen">
+    </node>
+
 </launch>

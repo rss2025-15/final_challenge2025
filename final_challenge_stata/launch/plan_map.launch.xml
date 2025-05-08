@@ -1,0 +1,12 @@
+<launch>
+ <!-- Launches map from map folder and map server-->
+  <arg name="map_planning" default="/root/racecar_ws/src/final_challenge2025/final_challenge_stata/launch/map.yaml"/>
+  <node name="map_planning" pkg="nav2_map_server" exec="map_server" output="screen">
+    <param name="yaml_filename" value="$(var map_planning)"/>
+    <remap from="map" to="map_planning"/>
+  </node>
+  <node name="lifecycle_manager_2" exec="lifecycle_manager" pkg="nav2_lifecycle_manager" output="screen">
+    <param name="autostart" value="True"/>
+    <param name="node_names" value="['map_planning']"/>
+  </node>
+</launch>

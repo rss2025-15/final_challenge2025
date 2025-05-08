@@ -11,6 +11,7 @@ import math
 import cv2
 # import imageio
 import sys
+import os
 
 np.set_printoptions(threshold=sys.maxsize)
 
@@ -31,7 +32,7 @@ class PathPlan(Node):
         self.initial_pose_topic = self.get_parameter('initial_pose_topic').get_parameter_value().string_value
         self.pose_estimate_topic = self.get_parameter('pose_estimate_topic').get_parameter_value().string_value
         # self.odom_topic = "/odom"
-        # self.map_topic = "/map"
+        self.map_topic = "/map_planning"
         # self.initial_pose_topic = "/initialpose"
 
         self.map_sub = self.create_subscription(
@@ -80,11 +81,51 @@ class PathPlan(Node):
         self.DOWNSAMPLED_ROWS = None
         self.DOWNSAMPLED_COLS = None
         self.pos = (0, 0)
-        self.dilation = 12
+        self.dilation = 6
         self.map_initialized = False
+        # self.process_map()
 
 
         self.get_logger().info("Trajectory planner node started")
+
+    def process_map(self):
+        node_dir = os.path.dirname(os.path.abspath(__file__))
+        img_path = os.path.join(node_dir, "map2_flip.png")
+        self.get_logger().info(f"image path: {img_path}")
+        img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
+        
+        if img is None:
+            raise Exception("bad :(")
+
+        grid = np.where(img < 50, 1, 0).astype(np.uint8).flatten().tolist()
+
+        self.ROWS = 1300
+        self.COLS = 1730
+        self.RES = 0.0504
+        self.origin = (25.900000, 48.50000, 3.14)
+        self.get_logger().info("Map size: {} x {}".format(self.ROWS, self.COLS))
+
+        g = np.reshape(grid, (self.ROWS, self.COLS))
+        self.map = np.where(np.logical_or(g == -1, g == 100), 1, g)
+        # self.get_logger().info(f"map: {self.map}")
+        self.map = cv2.dilate(self.map.astype('uint8'), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (self.dilation, self.dilation)))
+        map_path = os.path.join(node_dir, "filtered.png")
+        debug_img = (self.map * 255).astype(np.uint8)
+        cv2.imwrite(map_path, debug_img)
+        # map_info = np.array(msg.data).reshape((self.ROWS, self.COLS)) # reshape flattened array
+        # map_info = cv2.dilate(map_info.astype('uint8'), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (self.dilation, self.dilation)))
+        # self.map_data = map_info
+        
+
+        # self.downsampled_map = self.maxpool2d_np(self.map, self.downsampling_factor)
+        self.downsampled_map = self.maxpool2d(self.map, self.downsampling_factor)
+        # 
+        # self.get_logger().info(self.downsampled_map)
+        self.DOWNSAMPLED_ROWS = self.downsampled_map.shape[0]
+        self.DOWNSAMPLED_COLS = self.downsampled_map.shape[1]
+        self.get_logger().info("Downsampled map size: {} x {}".format(self.DOWNSAMPLED_ROWS, self.DOWNSAMPLED_COLS))
+        self.get_logger().info("Map received")
+        self.map_initialized = True
 
 
     def map_cb(self, msg):

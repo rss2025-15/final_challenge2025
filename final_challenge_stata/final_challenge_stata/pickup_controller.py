@@ -12,6 +12,7 @@ import numpy as np
 import math
 from final_challenge_stata.detector import Detector
 from std_msgs.msg import Int32, Bool
+import os
 
 
 class DetectorNode(Node):
@@ -35,7 +36,7 @@ class DetectorNode(Node):
 
         ###Detector
         self.detector = Detector()
-        self.detector.set_threshold(0.25)
+        self.detector.set_threshold(0.1)
         ####
         self.send_drive_command = True
         self.last_switch_command = True
@@ -69,6 +70,12 @@ class DetectorNode(Node):
 
         ####
         self.get_logger().info("Detector Initialized")
+
+        self.backup_status = 0 # 0 not doing anything -1 backwards, 1 going forwards
+        self.backup_status_start = None
+        self.front_backup_increment_time = 0.5
+        self.backup_increment_time = 1.5
+        self.image = None
 
     def camera_callback(self, camera_msg):
         # extract the image out of camera msg
@@ -109,6 +116,7 @@ class DetectorNode(Node):
                 debug_msg = self.bridge.cv2_to_imgmsg(image, "bgr8")
                 # self.get_logger().info(f"{cone_pixel.u, cone_pixel.v}")
                 self.debug_pub.publish(debug_msg)
+                self.image = image
 
                 ####debug
 
@@ -137,10 +145,19 @@ class DetectorNode(Node):
         if not self.detect:
             return
         if self.start_searching and self.detection_valid_time is None:
-            # go in circles
+            # turn in place
             self.switch_cmd(True)
-            self.drive_cmd(self.max_steer, -0.7)
-            self.get_logger().info('FULL BACK LEFT')
+            # self.drive_cmd(self.max_steer, -0.7)
+            self.get_logger().info('SEARCHING FOR BANANA')
+            steer_dir = 1
+            self.drive_cmd(-steer_dir*self.max_steer*self.backup_status, self.backup_status*self.speed)
+            backup_time = self.front_backup_increment_time if self.backup_status == 1 else self.backup_increment_time
+            if self.backup_status == 0:
+                self.backup_status = -1
+                self.backup_status_start = self.get_clock().now().nanoseconds*float(10**-9)
+            elif (self.get_clock().now().nanoseconds*float(10**-9) - self.backup_status_start) > backup_time:
+                self.backup_status = -self.backup_status
+                self.backup_status_start = self.get_clock().now().nanoseconds*float(10**-9)
             return
         elif self.detection_valid_time is None:
             return
@@ -192,6 +209,9 @@ class DetectorNode(Node):
         else:
             self.drive_cmd(0.0, 0.0)
             # the car stops moving for 5 seconds and then continues to move
+            node_dir = os.path.dirname(os.path.abspath(__file__))
+            img_path = os.path.join(node_dir, "banana.png")
+            cv2.imwrite(img_path, self.image)
             if not self.start_time:
                  self.start_time = self.get_clock().now().nanoseconds*10**-9
             self.get_logger().info(f'start time is {self.start_time}')
@@ -203,6 +223,7 @@ class DetectorNode(Node):
             ##if target distance is less than 0.5 m then send the switch command again
 
             self.get_logger().info(f'Publishing SHRINK ray count of {self.shrinkray_count} ')
+            self.detection_valid_time = None
             self.shrink_count_cmd(self.shrinkray_count)
             #stop publishing
             # self.get_logger().info('turning self.detect to false')

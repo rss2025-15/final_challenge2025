@@ -44,7 +44,7 @@ class TrafficNode(Node):
 
         # detector
         self.detector = Detector()
-        self.detector.set_threshold(0.7)
+        self.detector.set_threshold(0.5)
 
         self.cached_bounding_box = None
         self.signal = None
@@ -91,13 +91,11 @@ class TrafficNode(Node):
                     # drive_cmd = AckermannDriveStamped()
                     # drive_cmd.drive.speed = 0.0
                     # self.drive_pub.publish(drive_cmd)
-                    self.cached_bounding_box = (x1, y1, x2, y2)
+                    # self.cached_bounding_box = (x1, y1, x2, y2)
                     stop_cmd_msg = Bool()
                     stop_cmd_msg.data = True
                     self.stop_pub.publish(stop_cmd_msg)
                     return
-                else:
-                    self.cached_bounding_box = None
                 # else:
                 #     stop_cmd_msg.data = False
                 #     self.stop_pub.publish(stop_cmd_msg)
@@ -105,40 +103,40 @@ class TrafficNode(Node):
             # else:
             #     self.drive_cmd()
 
-        if self.cached_bounding_box:
-            self.get_logger().info("bounding box cached")
-            x1, y1, x2, y2 = self.cached_bounding_box
-            cv2.rectangle(image_debug, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            cv2.putText(image_debug, f"detected color: {self.signal}", (10,30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255,255,255), 2)
-            debug_msg = self.bridge.cv2_to_imgmsg(image_debug, "bgr8")
-            self.debug_pub.publish(debug_msg)
+        # if self.cached_bounding_box:
+        #     self.get_logger().info("bounding box cached")
+        #     x1, y1, x2, y2 = self.cached_bounding_box
+        #     cv2.rectangle(image_debug, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        #     cv2.putText(image_debug, f"detected color: {self.signal}", (10,30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255,255,255), 2)
+        #     debug_msg = self.bridge.cv2_to_imgmsg(image_debug, "bgr8")
+        #     self.debug_pub.publish(debug_msg)
             
-            cropped_img = image[y1:y2+1, x1:x2+1]
+        #     cropped_img = image[y1:y2+1, x1:x2+1]
             
-            signal = self.color_detect(cropped_img)
-            stop_cmd = (signal == 'red')
-            self.get_logger().info(f'Detected {signal}, should_stop={stop_cmd}')
+        #     signal = self.color_detect(cropped_img)
+        #     stop_cmd = (signal == 'red')
+        #     self.get_logger().info(f'Detected {signal}, should_stop={stop_cmd}')
 
-            # mask = None
-            # for rng in self.color_thresh[signal]:
-            #     m = cv2.inRange(hsv_img, rng['lower'], rng['upper'])
-            #     mask = m if mask is None else cv2.bitwise_or(mask, m)
-            # image = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+        #     # mask = None
+        #     # for rng in self.color_thresh[signal]:
+        #     #     m = cv2.inRange(hsv_img, rng['lower'], rng['upper'])
+        #     #     mask = m if mask is None else cv2.bitwise_or(mask, m)
+        #     # image = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
 
-            # debug_msg = self.bridge.cv2_to_imgmsg(image, "bgr8")
-            # self.debug_pub.publish(debug_msg)
+        #     # debug_msg = self.bridge.cv2_to_imgmsg(image, "bgr8")
+        #     # self.debug_pub.publish(debug_msg)
 
-            if stop_cmd:
-                # drive_cmd = AckermannDriveStamped()
-                # drive_cmd.drive.speed = 0.0
-                # self.drive_pub.publish(drive_cmd)
-                self.cached_bounding_box = (x1, y1, x2, y2)
-                stop_cmd_msg = Bool()
-                stop_cmd_msg.data = True
-                self.stop_pub.publish(stop_cmd_msg)
-                return
-            else:
-                self.cached_bounding_box = None
+        #     if stop_cmd:
+        #         # drive_cmd = AckermannDriveStamped()
+        #         # drive_cmd.drive.speed = 0.0
+        #         # self.drive_pub.publish(drive_cmd)
+        #         self.cached_bounding_box = (x1, y1, x2, y2)
+        #         stop_cmd_msg = Bool()
+        #         stop_cmd_msg.data = True
+        #         self.stop_pub.publish(stop_cmd_msg)
+        #         return
+        #     else:
+        #         self.cached_bounding_box = None
             # else:
             #     stop_cmd_msg.data = False
             #     self.stop_pub.publish(stop_cmd_msg)

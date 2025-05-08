@@ -14,6 +14,7 @@ import numpy as np
 import math
 import rclpy
 import csv
+import time
 
 
 class PurePursuit(Node):
@@ -78,6 +79,11 @@ class PurePursuit(Node):
         self.start_detection_pub = self.create_publisher(Bool, "/start_detection", 1)
         self.start_searching_pub = self.create_publisher(Bool, "/start_searching", 1)
 
+        self.backup_status = 0 # 0 not doing anything -1 backwards, 1 going forwards
+        self.backup_status_start = None
+        self.front_backup_increment_time = 0.5
+        self.backup_increment_time = 1.5
+
 
     def parking_cb(self, parking_msg):
         if parking_msg.data:
@@ -113,13 +119,22 @@ class PurePursuit(Node):
 
                 if abs(angle_to_start) > self.start_turn:
                     steer_dir = -1.0 if angle_to_start > 0 else 1.0
-
-                    self.drive_cmd(steer_dir*self.max_steer, -1*self.speed)
+                    # going right in small increments
+                    self.drive_cmd(-steer_dir*self.max_steer*self.backup_status, self.backup_status*self.speed)
+                    backup_time = self.front_backup_increment_time if self.backup_status == 1 else self.backup_increment_time
+                    if self.backup_status == 0:
+                        self.backup_status = -1
+                        self.backup_status_start = self.get_clock().now().nanoseconds*float(10**-9)
+                    elif (self.get_clock().now().nanoseconds*float(10**-9) - self.backup_status_start) > backup_time:
+                        self.backup_status = -self.backup_status
+                        self.backup_status_start = self.get_clock().now().nanoseconds*float(10**-9)
                     return
 
                 else:
+                    self.backup_status = 0
                     self.on_path = True
-
+                    self.drive_cmd(0.0, 0.0)
+                    time.sleep(1)
             
             # FINDING CLOSEST SEGMENT
             # https://stackoverflow.com/questions/849211/shortest-distance-between-a-point-and-a-line-segment/1501725#1501725

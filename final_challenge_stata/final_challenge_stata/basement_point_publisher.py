@@ -13,8 +13,8 @@ class BasementPointPublisher(Node):
     def __init__(self):
         super().__init__("BasementPointPub")
         self.publisher = self.create_publisher(PoseArray, "/shrinkray_part", 1)
-        self.subscriber = self.create_subscription(PointStamped, "/clicked_point", self.callback, 1)
-        # self.subscriber = self.create_subscription(PoseStamped, "/goal_pose", self.callback, 1)
+        # self.subscriber = self.create_subscription(PointStamped, "/clicked_point", self.callback, 1)
+        self.subscriber = self.create_subscription(PoseStamped, "/goal_pose", self.callback, 10)
 
         self.array = []
 
@@ -22,23 +22,23 @@ class BasementPointPublisher(Node):
 
         self.get_logger().info("Point Publisher Initialized")
 
-    def callback(self, point_msg: PointStamped):
-        x,y = point_msg.point.x, point_msg.point.y
-        self.get_logger().info(f"Received point: {x}, {y}")
-        self.array.append(Pose(position=Point(x=x, y=y, z=0.0)))
-        
-        if len(self.array) == 2:
-            self.publish()
-    
-    # def callback(self, pose_msg: PoseStamped):
-    #     x_start, y_start = self.start_pose
-    #     x,y = pose_msg.pose.position.x, pose_msg.pose.position.y
+    # def callback(self, point_msg: PointStamped):
+    #     x,y = point_msg.point.x, point_msg.point.y
     #     self.get_logger().info(f"Received point: {x}, {y}")
-    #     self.array.append(Pose(position=Point(x=x, y=y, z=0.0)))        
+    #     self.array.append(Pose(position=Point(x=x, y=y, z=0.0)))
+        
     #     if len(self.array) == 2:
-    #         if (self.array[0].position.x-x_start)**2 + (self.array[0].position.y-y_start)**2 > (self.array[1].position.x-x_start)**2 + (self.array[1].position.y-y_start)**2:
-    #             self.array = [self.array[1], self.array[0]]
     #         self.publish()
+    
+    def callback(self, pose_msg: PoseStamped):
+        x_start, y_start = self.start_pose
+        x,y = pose_msg.pose.position.x, pose_msg.pose.position.y
+        self.get_logger().info(f"Received point: {x}, {y}")
+        self.array.append(Pose(position=Point(x=x, y=y, z=0.0)))        
+        if len(self.array) == 2:
+            if (self.array[0].position.x-x_start)**2 + (self.array[0].position.y-y_start)**2 > (self.array[1].position.x-x_start)**2 + (self.array[1].position.y-y_start)**2:
+                self.array = [self.array[1], self.array[0]]
+            self.publish()
 
     def publish(self):
         # Publish PoseArray

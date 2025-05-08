@@ -44,6 +44,7 @@ class SafetyController(Node):
         self.latest_cmd = None # keep track of last command
         self.odom_speed = None
         self.traffic_stop = False
+        self.start_back = None
 
         self.get_logger().info("starting safety controller")
 
@@ -56,13 +57,33 @@ class SafetyController(Node):
         return (0.47 * speed - 0.3) + self.GOAL_DISTANCE
 
     def scan_callback(self, scan):
-        if self.latest_cmd is None or self.odom_speed is None:
+        if self.latest_cmd is None or self.odom_speed is None or self.latest_cmd.drive.speed < 0:
             return
         if self.traffic_stop:
-            self.get_logger().info("traffic light")
-            drive_msg = AckermannDriveStamped()
-            drive_msg.drive.speed = 0.0
-            self.safety_pub.publish(drive_msg)
+            if self.start_back is None:
+                self.get_logger().info("traffic light")
+                drive_msg = AckermannDriveStamped()
+                drive_msg.drive.speed = -0.7
+                self.safety_pub.publish(drive_msg)
+                self.start_back = self.get_clock().now().nanoseconds*10**-9
+                return
+            elif (self.get_clock().now().nanoseconds*10**-9 - self.start_back)>0.3:
+                drive_msg = AckermannDriveStamped()
+                drive_msg.drive.speed = 0.0
+                self.safety_pub.publish(drive_msg)
+                self.start_back = -1
+                return
+            elif self.start_back == -1:
+                drive_msg = AckermannDriveStamped()
+                drive_msg.drive.speed = 0.0
+                self.safety_pub.publish(drive_msg)
+                return
+            else:
+                drive_msg = AckermannDriveStamped()
+                drive_msg.drive.speed = -0.7
+                self.safety_pub.publish(drive_msg)
+                return
+        self.start_back = None
         ranges = np.array(scan.ranges)
         angles = np.linspace(scan.angle_min, scan.angle_max, len(ranges))
         steer_angle = self.latest_cmd.drive.steering_angle
@@ -97,14 +118,14 @@ class SafetyController(Node):
                     drive_msg.drive.speed = self.latest_cmd.drive.speed
                     drive_msg.drive.steering_angle = self.max_steer
                     self.safety_pub.publish(drive_msg)
-                    self.get_logger().info("going left")
+                    # self.get_logger().info("going left")
                     return
                 elif min_right_distance > safe_distance:
                     drive_msg = AckermannDriveStamped()
                     drive_msg.drive.speed = self.latest_cmd.drive.speed
                     drive_msg.drive.steering_angle = -self.max_steer
                     self.safety_pub.publish(drive_msg)
-                    self.get_logger().info("going right")
+                    # self.get_logger().info("going right")
                     return
             elif steer_angle < 0:
                 if min_right_distance > safe_distance:
@@ -112,18 +133,18 @@ class SafetyController(Node):
                     drive_msg.drive.speed = self.latest_cmd.drive.speed
                     drive_msg.drive.steering_angle = -self.max_steer
                     self.safety_pub.publish(drive_msg)
-                    self.get_logger().info("going right")
+                    # self.get_logger().info("going right")
                     return
                 elif min_left_distance > safe_distance:
                     drive_msg = AckermannDriveStamped()
                     drive_msg.drive.speed = self.latest_cmd.drive.speed
                     drive_msg.drive.steering_angle = self.max_steer
                     self.safety_pub.publish(drive_msg)
-                    self.get_logger().info("going left")
+                    # self.get_logger().info("going left")
                     return
             drive_msg = AckermannDriveStamped()
-            drive_msg.drive.speed = 0.0
-            self.get_logger().info("stopping")
+            drive_msg.drive.speed = -0.7
+            # self.get_logger().info("stopping")
             self.safety_pub.publish(drive_msg)
 
         # if self.odom_speed:

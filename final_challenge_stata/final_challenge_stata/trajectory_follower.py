@@ -82,7 +82,7 @@ class PurePursuit(Node):
         self.backup_status = 0 # 0 not doing anything -1 backwards, 1 going forwards
         self.backup_status_start = None
         self.front_backup_increment_time = 0.5
-        self.backup_increment_time = 1.5
+        self.backup_increment_time = 2.0
 
 
     def parking_cb(self, parking_msg):

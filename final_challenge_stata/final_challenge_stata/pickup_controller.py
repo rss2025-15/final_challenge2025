@@ -189,7 +189,7 @@ class DetectorNode(Node):
 
         turn_radius = lookahead / (2*math.sin(math.atan2(self.relative_y,self.relative_x)))
 
-        if lookahead > 1.0 and abs(turn_radius) >= self.min_turn_radius and (curr_time-self.detection_valid_time <= self.detection_valid_thres):
+        if lookahead > 1.2 and abs(turn_radius) >= self.min_turn_radius and (curr_time-self.detection_valid_time <= self.detection_valid_thres):
             steer_angle = math.atan(self.wheelbase_length/turn_radius)
 
             self.drive_cmd(steer_angle, self.cmd_speed)
@@ -210,7 +210,7 @@ class DetectorNode(Node):
             self.drive_cmd(0.0, 0.0)
             # the car stops moving for 5 seconds and then continues to move
             node_dir = os.path.dirname(os.path.abspath(__file__))
-            img_path = os.path.join(node_dir, "banana.png")
+            img_path = os.path.join(node_dir, "outputs/banana.png")
             cv2.imwrite(img_path, self.image)
             if not self.start_time:
                  self.start_time = self.get_clock().now().nanoseconds*10**-9
